@@ -1,32 +1,46 @@
---// SETTINGS
-local ADMIN_USERID = 123456789 -- << DEINE USER ID EINTRAGEN
+--// =========================
+--//        SETTINGS
+--// =========================
+local ADMIN_USERID = 123456789 -- DEINE USER ID
 
---// SERVICES
+--// =========================
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
---// FUNCTIONS
-
-local function createGUI(player)
+--// =========================
+local function createAdminPanel(player)
 
 	local espEnabled = false
-	local invisible = false
-	
+	local invisibleEnabled = false
+	local highlights = {}
+
+	-- GUI
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "AdminPanel"
 	gui.ResetOnSpawn = false
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	-- MAIN FRAME
 	local frame = Instance.new("Frame", gui)
-	frame.Size = UDim2.new(0, 300, 0, 300)
-	frame.Position = UDim2.new(0.5, -150, 0.5, -150)
-	frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	frame.Size = UDim2.new(0, 320, 0, 280)
+	frame.Position = UDim2.new(0.5, -160, 0.5, -140)
+	frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 	frame.BorderSizePixel = 0
+	frame.Active = true
+	frame.Draggable = true
 
-	-- Close Button
+	-- TITLE
+	local title = Instance.new("TextLabel", frame)
+	title.Size = UDim2.new(1,0,0,40)
+	title.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	title.Text = "ADMIN PANEL"
+	title.TextColor3 = Color3.new(1,1,1)
+	title.TextScaled = true
+
+	-- CLOSE
 	local close = Instance.new("TextButton", frame)
-	close.Size = UDim2.new(0, 35, 0, 35)
-	close.Position = UDim2.new(1, -40, 0, 5)
+	close.Size = UDim2.new(0,40,0,40)
+	close.Position = UDim2.new(1,-40,0,0)
 	close.Text = "X"
 	close.BackgroundColor3 = Color3.fromRGB(170,0,0)
 	close.TextColor3 = Color3.new(1,1,1)
@@ -35,8 +49,7 @@ local function createGUI(player)
 		gui.Enabled = false
 	end)
 
-	-- Toggle mit M
-	local UserInputService = game:GetService("UserInputService")
+	-- TOGGLE KEY (M)
 	UserInputService.InputBegan:Connect(function(input,gp)
 		if gp then return end
 		if input.KeyCode == Enum.KeyCode.M then
@@ -44,83 +57,89 @@ local function createGUI(player)
 		end
 	end)
 
-	-- ESP BUTTON
-	local espButton = Instance.new("TextButton", frame)
-	espButton.Size = UDim2.new(0, 220, 0, 50)
-	espButton.Position = UDim2.new(0.5, -110, 0, 60)
-	espButton.Text = "ESP"
-	espButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	espButton.TextColor3 = Color3.new(1,1,1)
-
-	local espStatus = Instance.new("TextLabel", frame)
-	espStatus.Size = UDim2.new(0, 120, 0, 30)
-	espStatus.Position = UDim2.new(1, -130, 0, 70)
-	espStatus.BackgroundTransparency = 1
-	espStatus.Text = "OFF"
-	espStatus.TextColor3 = Color3.fromRGB(255,0,0)
-
-	local highlights = {}
-
-	local function enableESP()
+	-- FUNCTION: ESP
+	local function updateESP()
 		for _,plr in pairs(Players:GetPlayers()) do
-			if plr ~= player and plr.Character then
+			if plr ~= player and plr.Character and not highlights[plr] then
 				local hl = Instance.new("Highlight")
 				hl.FillColor = Color3.fromRGB(0,255,0)
-				hl.OutlineColor = Color3.fromRGB(0,0,0)
+				hl.OutlineColor = Color3.new(0,0,0)
 				hl.Parent = plr.Character
 				highlights[plr] = hl
 			end
 		end
 	end
 
-	local function disableESP()
+	local function removeESP()
 		for _,hl in pairs(highlights) do
 			if hl then hl:Destroy() end
 		end
 		highlights = {}
 	end
 
-	espButton.MouseButton1Click:Connect(function()
+	-- ESP BUTTON
+	local espBtn = Instance.new("TextButton", frame)
+	espBtn.Size = UDim2.new(0,240,0,50)
+	espBtn.Position = UDim2.new(0.5,-120,0,60)
+	espBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	espBtn.Text = "ESP"
+	espBtn.TextColor3 = Color3.new(1,1,1)
+
+	local espStatus = Instance.new("TextLabel", frame)
+	espStatus.Size = UDim2.new(0,80,0,30)
+	espStatus.Position = UDim2.new(1,-90,0,70)
+	espStatus.BackgroundTransparency = 1
+	espStatus.Text = "OFF"
+	espStatus.TextColor3 = Color3.fromRGB(255,0,0)
+
+	espBtn.MouseButton1Click:Connect(function()
 		espEnabled = not espEnabled
-		
 		if espEnabled then
 			espStatus.Text = "ON"
 			espStatus.TextColor3 = Color3.fromRGB(0,255,0)
-			enableESP()
+			updateESP()
 		else
 			espStatus.Text = "OFF"
 			espStatus.TextColor3 = Color3.fromRGB(255,0,0)
-			disableESP()
+			removeESP()
+		end
+	end)
+
+	-- Auto update ESP when new players join
+	Players.PlayerAdded:Connect(function()
+		if espEnabled then
+			task.wait(1)
+			updateESP()
 		end
 	end)
 
 	-- INVISIBLE BUTTON
-	local invisButton = Instance.new("TextButton", frame)
-	invisButton.Size = UDim2.new(0, 220, 0, 50)
-	invisButton.Position = UDim2.new(0.5, -110, 0, 130)
-	invisButton.Text = "Invisible"
-	invisButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	invisButton.TextColor3 = Color3.new(1,1,1)
+	local invisBtn = Instance.new("TextButton", frame)
+	invisBtn.Size = UDim2.new(0,240,0,50)
+	invisBtn.Position = UDim2.new(0.5,-120,0,130)
+	invisBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	invisBtn.Text = "Invisible"
+	invisBtn.TextColor3 = Color3.new(1,1,1)
 
 	local invisStatus = Instance.new("TextLabel", frame)
-	invisStatus.Size = UDim2.new(0, 120, 0, 30)
-	invisStatus.Position = UDim2.new(1, -130, 0, 140)
+	invisStatus.Size = UDim2.new(0,80,0,30)
+	invisStatus.Position = UDim2.new(1,-90,0,140)
 	invisStatus.BackgroundTransparency = 1
 	invisStatus.Text = "OFF"
 	invisStatus.TextColor3 = Color3.fromRGB(255,0,0)
 
-	invisButton.MouseButton1Click:Connect(function()
-		invisible = not invisible
-		
+	invisBtn.MouseButton1Click:Connect(function()
+		invisibleEnabled = not invisibleEnabled
+
 		if player.Character then
-			for _,part in pairs(player.Character:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.Transparency = invisible and 0.6 or 0
+			for _,v in pairs(player.Character:GetDescendants()) do
+				if v:IsA("BasePart") then
+					v.Transparency = invisibleEnabled and 0.6 or 0
 				end
 			end
 		end
-		
-		if invisible then
+
+		if invisibleEnabled then
 			invisStatus.Text = "ON"
 			invisStatus.TextColor3 = Color3.fromRGB(0,255,0)
 		else
@@ -130,14 +149,14 @@ local function createGUI(player)
 	end)
 
 	-- TELEPORT BUTTON
-	local tpButton = Instance.new("TextButton", frame)
-	tpButton.Size = UDim2.new(0, 220, 0, 50)
-	tpButton.Position = UDim2.new(0.5, -110, 0, 200)
-	tpButton.Text = "Teleport Base"
-	tpButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	tpButton.TextColor3 = Color3.new(1,1,1)
+	local tpBtn = Instance.new("TextButton", frame)
+	tpBtn.Size = UDim2.new(0,240,0,50)
+	tpBtn.Position = UDim2.new(0.5,-120,0,200)
+	tpBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	tpBtn.Text = "Teleport Base"
+	tpBtn.TextColor3 = Color3.new(1,1,1)
 
-	tpButton.MouseButton1Click:Connect(function()
+	tpBtn.MouseButton1Click:Connect(function()
 		local spawn = workspace:FindFirstChild("SpawnLocation")
 		if spawn and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 			player.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0,5,0)
@@ -146,12 +165,12 @@ local function createGUI(player)
 
 end
 
--- GIVE GUI TO ADMIN
+-- GIVE PANEL
 Players.PlayerAdded:Connect(function(player)
 	if player.UserId == ADMIN_USERID then
 		player.CharacterAdded:Connect(function()
-			wait(1)
-			createGUI(player)
+			task.wait(1)
+			createAdminPanel(player)
 		end)
 	end
 end)
