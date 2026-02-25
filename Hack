@@ -1,128 +1,157 @@
---[[
-    B-StealABrainrot GUI
-    Erstellt für den Nutzer
-    Features: Auto Steal, Auto Farm, Speed, Jump, ESP, Noclip
-]]
+--// SETTINGS
+local ADMIN_USERID = 123456789 -- << DEINE USER ID EINTRAGEN
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/7Lib/7Lib/main/7Lib.lua"))()
-local Window = Library.CreateLib("B-Steal A Brainrot Hub", "DarkTheme")
-
--- Variables
+--// SERVICES
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
 
-local AutoSteal = false
-local AutoFarm = false
-local WalkSpeed = 16
-local JumpPower = 50
-local Noclip = false
+--// FUNCTIONS
 
--- Anti-AFK
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
+local function createGUI(player)
+
+	local espEnabled = false
+	local invisible = false
+	
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "AdminPanel"
+	gui.ResetOnSpawn = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	local frame = Instance.new("Frame", gui)
+	frame.Size = UDim2.new(0, 300, 0, 300)
+	frame.Position = UDim2.new(0.5, -150, 0.5, -150)
+	frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	frame.BorderSizePixel = 0
+
+	-- Close Button
+	local close = Instance.new("TextButton", frame)
+	close.Size = UDim2.new(0, 35, 0, 35)
+	close.Position = UDim2.new(1, -40, 0, 5)
+	close.Text = "X"
+	close.BackgroundColor3 = Color3.fromRGB(170,0,0)
+	close.TextColor3 = Color3.new(1,1,1)
+
+	close.MouseButton1Click:Connect(function()
+		gui.Enabled = false
+	end)
+
+	-- Toggle mit M
+	local UserInputService = game:GetService("UserInputService")
+	UserInputService.InputBegan:Connect(function(input,gp)
+		if gp then return end
+		if input.KeyCode == Enum.KeyCode.M then
+			gui.Enabled = not gui.Enabled
+		end
+	end)
+
+	-- ESP BUTTON
+	local espButton = Instance.new("TextButton", frame)
+	espButton.Size = UDim2.new(0, 220, 0, 50)
+	espButton.Position = UDim2.new(0.5, -110, 0, 60)
+	espButton.Text = "ESP"
+	espButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	espButton.TextColor3 = Color3.new(1,1,1)
+
+	local espStatus = Instance.new("TextLabel", frame)
+	espStatus.Size = UDim2.new(0, 120, 0, 30)
+	espStatus.Position = UDim2.new(1, -130, 0, 70)
+	espStatus.BackgroundTransparency = 1
+	espStatus.Text = "OFF"
+	espStatus.TextColor3 = Color3.fromRGB(255,0,0)
+
+	local highlights = {}
+
+	local function enableESP()
+		for _,plr in pairs(Players:GetPlayers()) do
+			if plr ~= player and plr.Character then
+				local hl = Instance.new("Highlight")
+				hl.FillColor = Color3.fromRGB(0,255,0)
+				hl.OutlineColor = Color3.fromRGB(0,0,0)
+				hl.Parent = plr.Character
+				highlights[plr] = hl
+			end
+		end
+	end
+
+	local function disableESP()
+		for _,hl in pairs(highlights) do
+			if hl then hl:Destroy() end
+		end
+		highlights = {}
+	end
+
+	espButton.MouseButton1Click:Connect(function()
+		espEnabled = not espEnabled
+		
+		if espEnabled then
+			espStatus.Text = "ON"
+			espStatus.TextColor3 = Color3.fromRGB(0,255,0)
+			enableESP()
+		else
+			espStatus.Text = "OFF"
+			espStatus.TextColor3 = Color3.fromRGB(255,0,0)
+			disableESP()
+		end
+	end)
+
+	-- INVISIBLE BUTTON
+	local invisButton = Instance.new("TextButton", frame)
+	invisButton.Size = UDim2.new(0, 220, 0, 50)
+	invisButton.Position = UDim2.new(0.5, -110, 0, 130)
+	invisButton.Text = "Invisible"
+	invisButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	invisButton.TextColor3 = Color3.new(1,1,1)
+
+	local invisStatus = Instance.new("TextLabel", frame)
+	invisStatus.Size = UDim2.new(0, 120, 0, 30)
+	invisStatus.Position = UDim2.new(1, -130, 0, 140)
+	invisStatus.BackgroundTransparency = 1
+	invisStatus.Text = "OFF"
+	invisStatus.TextColor3 = Color3.fromRGB(255,0,0)
+
+	invisButton.MouseButton1Click:Connect(function()
+		invisible = not invisible
+		
+		if player.Character then
+			for _,part in pairs(player.Character:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.Transparency = invisible and 0.6 or 0
+				end
+			end
+		end
+		
+		if invisible then
+			invisStatus.Text = "ON"
+			invisStatus.TextColor3 = Color3.fromRGB(0,255,0)
+		else
+			invisStatus.Text = "OFF"
+			invisStatus.TextColor3 = Color3.fromRGB(255,0,0)
+		end
+	end)
+
+	-- TELEPORT BUTTON
+	local tpButton = Instance.new("TextButton", frame)
+	tpButton.Size = UDim2.new(0, 220, 0, 50)
+	tpButton.Position = UDim2.new(0.5, -110, 0, 200)
+	tpButton.Text = "Teleport Base"
+	tpButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	tpButton.TextColor3 = Color3.new(1,1,1)
+
+	tpButton.MouseButton1Click:Connect(function()
+		local spawn = workspace:FindFirstChild("SpawnLocation")
+		if spawn and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			player.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0,5,0)
+		end
+	end)
+
+end
+
+-- GIVE GUI TO ADMIN
+Players.PlayerAdded:Connect(function(player)
+	if player.UserId == ADMIN_USERID then
+		player.CharacterAdded:Connect(function()
+			wait(1)
+			createGUI(player)
+		end)
+	end
 end)
-
--- Tabs
-local MainTab = Window:NewTab("Main")
-local MovementTab = Window:NewTab("Movement")
-local VisualsTab = Window:NewTab("Visuals")
-local CreditsTab = Window:NewTab("Credits")
-
--- Main Features
-local MainSection = MainTab:NewSection("Automation")
-
-MainSection:NewToggle("Auto Steal", "Stiehlt automatisch Brainrots von anderen Plots", function(state)
-    AutoSteal = state
-    while AutoSteal do
-        task.wait(0.1)
-        pcall(function()
-            -- Suche nach Plots und Podien
-            for _, v in pairs(game:GetService("Workspace").Plots:GetChildren()) do
-                if v:FindFirstChild("Podium") and v.Owner.Value ~= LocalPlayer.Name then
-                    -- Simuliere Interaktion oder feuere Remote (Spiel-spezifisch)
-                    -- Da Remotes variieren können, nutzen wir eine generische Annäherung/Klick-Logik
-                    local podium = v.Podium
-                    if (LocalPlayer.Character.HumanoidRootPart.Position - podium.Position).Magnitude < 15 then
-                        -- Hier würde normalerweise ein RemoteEvent gefeuert werden
-                        -- Beispiel: game:GetService("ReplicatedStorage").Remotes.Steal:FireServer(v.Name)
-                        fireclickdetector(podium:FindFirstChildOfClass("ClickDetector"))
-                    end
-                end
-            end
-        end)
-    end
-end)
-
-MainSection:NewToggle("Auto Farm", "Sammelt automatisch Drops ein", function(state)
-    AutoFarm = state
-    while AutoFarm do
-        task.wait(0.1)
-        pcall(function()
-            for _, v in pairs(game:GetService("Workspace").Drops:GetChildren()) do
-                if v:IsA("BasePart") then
-                    v.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-                end
-            end
-        end)
-    end
-end)
-
-MainSection:NewButton("Load PusarX Hub", "Lädt das beliebte PusarX Skript", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Estevansit0/KJJK/refs/heads/main/PusarX-loader.lua"))()
-end)
-
-MainSection:NewButton("Load Light Hub", "Lädt das Light Hub Skript", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/LightHub-V2/sabscriptop/refs/heads/main/opscript"))()
-end)
-
--- Movement Features
-local MoveSection = MovementTab:NewSection("Character")
-
-MoveSection:NewSlider("WalkSpeed", "Ändert deine Geschwindigkeit", 250, 16, function(s)
-    WalkSpeed = s
-    LocalPlayer.Character.Humanoid.WalkSpeed = s
-end)
-
-MoveSection:NewSlider("JumpPower", "Ändert deine Sprungkraft", 500, 50, function(s)
-    JumpPower = s
-    LocalPlayer.Character.Humanoid.JumpPower = s
-end)
-
-MoveSection:NewToggle("Noclip", "Gehe durch Wände", function(state)
-    Noclip = state
-    RunService.Stepped:Connect(function()
-        if Noclip then
-            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
-            end
-        end
-    end)
-end)
-
--- Visuals
-local VisualSection = VisualsTab:NewSection("ESP")
-
-VisualSection:NewButton("Player ESP", "Zeigt Spieler durch Wände an", function()
-    -- Einfaches Box ESP
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local Highlight = Instance.new("Highlight")
-            Highlight.Parent = player.Character
-            Highlight.FillColor = Color3.fromRGB(255, 0, 0)
-            Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        end
-    end
-end)
-
--- Credits
-CreditsTab:NewSection("Erstellt von Manus für dich")
-CreditsTab:NewButton("Skript kopieren", "Kopiert das Skript in die Zwischenablage", function()
-    setclipboard("loadstring(game:HttpGet('https://raw.githubusercontent.com/LightHub-V2/sabscriptop/refs/heads/main/opscript'))()")
-end)
-
-Library:Notify("B-Steal A Brainrot Hub geladen!", "Viel Spaß beim Hacken!", 5)
