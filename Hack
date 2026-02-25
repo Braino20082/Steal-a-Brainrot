@@ -1,666 +1,1107 @@
--- ================================================
---   STEAL A BRAINROT - Admin GUI Script
---   Für: Lokaler Spielentwickler
---   Features: ESP, Steal, Invisible, Teleport, Toggle
--- ================================================
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║        STEAL A BRAINROT – Admin Script V4               ║
+-- ║  Steal · Auto Steal ALL · Best Steal · ESP · Invis      ║
+-- ║  Spawn Manager · Auto-TP nach Steal                     ║
+-- ╚══════════════════════════════════════════════════════════╝
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer      = Players.LocalPlayer
+local PlayerGui        = LocalPlayer:WaitForChild("PlayerGui")
 
--- ================================================
--- KONFIGURATION
--- ================================================
-local Config = {
-    ESPColor = Color3.fromRGB(255, 50, 50),
-    ESPEnabled = false,
-    InvisibleEnabled = false,
-    StealEnabled = false,
-    GUIOpen = true,
-    SpawnPosition = nil, -- wird beim Start gespeichert
+-- ══════════════════════════════════════════════════════
+--  CONFIG
+-- ══════════════════════════════════════════════════════
+local CFG = {
+    -- Steal
+    StealEnabled    = false,   -- Manuell: 1x besten stehlen bei Klick
+    AutoStealAll    = false,   -- Automatisch ALLES stehlen
+    AutoStealBest   = false,   -- Automatisch NUR den Besten stehlen
+    StealRadius     = 10,      -- Studs-Radius für Auto Steal
+    StealCooldown   = 1.0,     -- Sekunden zwischen Steals
+    AutoTP          = true,    -- Nach jedem Steal → Spawn TP
+
+    -- ESP
+    ESPEnabled      = false,
+    ESPColor        = Color3.fromRGB(244, 63, 94),
+    ShowNames       = true,
+    ShowDist        = true,
+    ShowBrainrots   = true,
+
+    -- Invisible
+    InvisEnabled    = false,
+    InvisTrans      = 1.0,     -- 1 = komplett unsichtbar
+
+    -- Spawn
+    SpawnCFrame     = nil,     -- gespeicherter Spawn-Punkt
 }
 
--- ================================================
--- SPAWN POSITION SPEICHERN
--- ================================================
-local function SaveSpawnPosition()
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        Config.SpawnPosition = char.HumanoidRootPart.CFrame
+-- Brainrot-Objekt-Namen (anpassen falls nötig!)
+local BRAINROT_NAMES = {
+    "Brainrot", "brainrot", "Brain", "Collectible",
+    "Item", "Pickup", "Drop", "BrainrotItem"
+}
+
+-- ══════════════════════════════════════════════════════
+--  SPAWN SYSTEM
+-- ══════════════════════════════════════════════════════
+local function GetChar()
+    return LocalPlayer.Character
+end
+
+local function GetHRP()
+    local c = GetChar()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function SaveSpawn()
+    local hrp = GetHRP()
+    if hrp then
+        CFG.SpawnCFrame = hrp.CFrame
+        print("[BrainrotAdmin] Spawn gespeichert:", hrp.CFrame.Position)
     end
 end
 
--- Warte auf Character und speichere Position
+local function TeleportToSpawn()
+    if not CFG.SpawnCFrame then
+        warn("[BrainrotAdmin] Kein Spawn gespeichert!")
+        return
+    end
+    local hrp = GetHRP()
+    if hrp then
+        hrp.CFrame = CFG.SpawnCFrame
+    end
+end
+
+-- Spawn beim Start speichern
 LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    SaveSpawnPosition()
+    task.wait(1.5)
+    SaveSpawn()
+    -- Unsichtbar nach Respawn neu anwenden
+    if CFG.InvisEnabled then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = CFG.InvisTrans
+            end
+        end
+    end
+    -- ESP nach Respawn neu aufbauen
+    task.wait(0.5)
+    if CFG.ESPEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                AddESP(p)
+            end
+        end
+    end
 end)
 
 if LocalPlayer.Character then
-    task.wait(1)
-    SaveSpawnPosition()
+    task.wait(1.5)
+    SaveSpawn()
 end
 
--- ================================================
--- GUI ERSTELLEN
--- ================================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BrainrotAdminGUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = PlayerGui
+-- ══════════════════════════════════════════════════════
+--  STEAL SYSTEM
+-- ══════════════════════════════════════════════════════
+local stealCooldownActive = false
+local stealCount = 0
 
--- Haupt-Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
+-- Sucht alle Brainrot-Objekte im Workspace
+local function FindAllBrainrots()
+    local found = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            for _, name in ipairs(BRAINROT_NAMES) do
+                if obj.Name:lower():find(name:lower()) then
+                    table.insert(found, obj)
+                    break
+                end
+            end
+        end
+    end
+    return found
+end
 
--- Abgerundete Ecken
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
+-- Findet den wertvollsten Brainrot (nach Name / Größe)
+local function FindBestBrainrot()
+    local brainrots = FindAllBrainrots()
+    if #brainrots == 0 then return nil end
+    -- Nimm den größten / ersten als "besten"
+    table.sort(brainrots, function(a, b)
+        local sA = a:IsA("BasePart") and a.Size.Magnitude or 1
+        local sB = b:IsA("BasePart") and b.Size.Magnitude or 1
+        return sA > sB
+    end)
+    return brainrots[1]
+end
 
--- Glow-Effekt (Stroke)
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(120, 60, 255)
-UIStroke.Thickness = 2
-UIStroke.Parent = MainFrame
+-- Findet den Spieler mit den meisten Brainrots
+local function GetRichestPlayer()
+    local best, bestVal = nil, -1
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            -- Versuche leaderstats / value zu lesen
+            local stats = player:FindFirstChild("leaderstats")
+            local val = 0
+            if stats then
+                for _, v in ipairs(stats:GetChildren()) do
+                    if v:IsA("NumberValue") or v:IsA("IntValue") then
+                        val = val + v.Value
+                    end
+                end
+            end
+            if val > bestVal then
+                bestVal = val
+                best = player
+            end
+        end
+    end
+    return best
+end
 
--- Gradient Hintergrund
-local UIGradient = Instance.new("UIGradient")
-UIGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 10, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 15, 35)),
-})
-UIGradient.Rotation = 135
-UIGradient.Parent = MainFrame
+-- Führt einen einzelnen Steal durch
+local function DoSteal(obj)
+    if stealCooldownActive then return false end
+    local hrp = GetHRP()
+    if not hrp then return false end
 
--- ================================================
--- TITELLEISTE
--- ================================================
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 50)
-TitleBar.Position = UDim2.new(0, 0, 0, 0)
-TitleBar.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
+    -- Zum Objekt teleportieren
+    local targetPos
+    if obj:IsA("BasePart") then
+        targetPos = obj.CFrame
+    elseif obj:IsA("Model") then
+        local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+        if root then targetPos = root.CFrame end
+    end
 
-local TitleGradient = Instance.new("UIGradient")
-TitleGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 50, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 20, 180)),
-})
-TitleGradient.Rotation = 90
-TitleGradient.Parent = TitleBar
+    if targetPos then
+        hrp.CFrame = targetPos * CFrame.new(0, 2, 0)
+        task.wait(0.1)
+    end
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 12)
-TitleCorner.Parent = TitleBar
+    -- Objekt "klauen" (aus Workspace entfernen)
+    local success = pcall(function()
+        if obj and obj.Parent then
+            obj.Parent = LocalPlayer.Backpack
+        end
+    end)
 
--- Titel-Fix (untere Ecken gerade)
-local TitleFix = Instance.new("Frame")
-TitleFix.Size = UDim2.new(1, 0, 0.5, 0)
-TitleFix.Position = UDim2.new(0, 0, 0.5, 0)
-TitleFix.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
-TitleFix.BorderSizePixel = 0
-TitleFix.Parent = TitleBar
+    stealCount = stealCount + 1
 
-local TitleFixGradient = Instance.new("UIGradient")
-TitleFixGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 50, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 20, 180)),
-})
-TitleFixGradient.Rotation = 90
-TitleFixGradient.Parent = TitleFix
+    -- Nach Steal → Spawn TP (wenn aktiviert)
+    if CFG.AutoTP and CFG.SpawnCFrame then
+        task.wait(0.05)
+        TeleportToSpawn()
+    end
 
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -60, 1, 0)
-TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "🧠 Brainrot Admin"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 18
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.Parent = TitleBar
+    -- Cooldown
+    stealCooldownActive = true
+    task.delay(CFG.StealCooldown, function()
+        stealCooldownActive = false
+    end)
 
--- Close Button
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 35, 0, 35)
-CloseBtn.Position = UDim2.new(1, -42, 0.5, -17)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 80)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 16
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.BorderSizePixel = 0
-CloseBtn.Parent = TitleBar
+    return true
+end
 
-local CloseBtnCorner = Instance.new("UICorner")
-CloseBtnCorner.CornerRadius = UDim.new(0, 8)
-CloseBtnCorner.Parent = CloseBtn
+-- ══════════════════════════════════════════════════════
+--  AUTO STEAL LOOP
+-- ══════════════════════════════════════════════════════
+RunService.Heartbeat:Connect(function()
+    -- AUTO STEAL ALL
+    if CFG.AutoStealAll then
+        local hrp = GetHRP()
+        if hrp and not stealCooldownActive then
+            local brainrots = FindAllBrainrots()
+            for _, obj in ipairs(brainrots) do
+                local pos
+                if obj:IsA("BasePart") then pos = obj.Position
+                elseif obj:IsA("Model") and obj.PrimaryPart then pos = obj.PrimaryPart.Position end
+                if pos then
+                    local dist = (hrp.Position - pos).Magnitude
+                    if dist <= CFG.StealRadius then
+                        DoSteal(obj)
+                        break -- 1 pro Frame, Cooldown regelt Speed
+                    end
+                end
+            end
+        end
+    end
 
--- ================================================
--- DRAGGABLE GUI
--- ================================================
-local dragging, dragStart, startPos
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
+    -- AUTO STEAL BEST (von reichstem Spieler)
+    if CFG.AutoStealBest then
+        if not stealCooldownActive then
+            local richest = GetRichestPlayer()
+            if richest and richest.Character then
+                local hrp = GetHRP()
+                local rhrp = richest.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and rhrp then
+                    -- TP zum Spieler, dann stehlen was er trägt
+                    hrp.CFrame = rhrp.CFrame * CFrame.new(0, 0, -3)
+                    task.wait(0.1)
+                    -- Sein Backpack leeren
+                    for _, tool in ipairs(richest.Backpack:GetChildren()) do
+                        local ok = pcall(function()
+                            tool.Parent = LocalPlayer.Backpack
+                        end)
+                        if ok then
+                            stealCount = stealCount + 1
+                        end
+                    end
+                    -- Auch getragene Tools klauen
+                    if richest.Character then
+                        for _, tool in ipairs(richest.Character:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                local ok = pcall(function()
+                                    tool.Parent = LocalPlayer.Backpack
+                                end)
+                                if ok then stealCount = stealCount + 1 end
+                            end
+                        end
+                    end
+                    if CFG.AutoTP and CFG.SpawnCFrame then
+                        TeleportToSpawn()
+                    end
+                    stealCooldownActive = true
+                    task.delay(CFG.StealCooldown + 0.5, function()
+                        stealCooldownActive = false
+                    end)
+                end
+            end
+        end
     end
 end)
-TitleBar.InputChanged:Connect(function(input)
+
+-- ══════════════════════════════════════════════════════
+--  ESP SYSTEM
+-- ══════════════════════════════════════════════════════
+local ESPObjects = {}
+
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        for _, obj in ipairs(ESPObjects[player]) do
+            pcall(function() obj:Destroy() end)
+        end
+        ESPObjects[player] = nil
+    end
+end
+
+local function AddESP(player)
+    if player == LocalPlayer then return end
+    RemoveESP(player)
+
+    local function BuildForChar(char)
+        if not char then return end
+        local hrp = char:FindFirstChildWhichIsA("BasePart")
+        if not hrp then
+            hrp = char:WaitForChild("HumanoidRootPart", 5)
+        end
+        if not hrp then return end
+
+        local objs = {}
+
+        -- SelectionBox (Highlight)
+        local box = Instance.new("SelectionBox")
+        box.Adornee            = char
+        box.Color3             = CFG.ESPColor
+        box.LineThickness      = 0.04
+        box.SurfaceTransparency = 0.75
+        box.SurfaceColor3      = CFG.ESPColor
+        box.Parent             = workspace
+        table.insert(objs, box)
+
+        -- BillboardGui (Name + Distanz)
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee      = hrp
+        billboard.Size         = UDim2.new(0, 140, 0, 36)
+        billboard.StudsOffset  = Vector3.new(0, 3.5, 0)
+        billboard.AlwaysOnTop  = true
+        billboard.Parent       = workspace
+
+        local nameLbl = Instance.new("TextLabel")
+        nameLbl.Size           = UDim2.new(1, 0, 0, 18)
+        nameLbl.Position       = UDim2.new(0, 0, 0, 0)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text           = player.Name
+        nameLbl.TextColor3     = CFG.ESPColor
+        nameLbl.TextSize       = 13
+        nameLbl.Font           = Enum.Font.GothamBold
+        nameLbl.TextStrokeTransparency = 0.4
+        nameLbl.Parent         = billboard
+
+        local distLbl = Instance.new("TextLabel")
+        distLbl.Size           = UDim2.new(1, 0, 0, 14)
+        distLbl.Position       = UDim2.new(0, 0, 0, 18)
+        distLbl.BackgroundTransparency = 1
+        distLbl.TextColor3     = Color3.fromRGB(200, 200, 200)
+        distLbl.TextSize       = 11
+        distLbl.Font           = Enum.Font.GothamBold
+        distLbl.TextStrokeTransparency = 0.5
+        distLbl.Parent         = billboard
+
+        table.insert(objs, billboard)
+        ESPObjects[player] = objs
+
+        -- Distanz updaten
+        RunService.Heartbeat:Connect(function()
+            if not CFG.ESPEnabled or not ESPObjects[player] then return end
+            local myHRP = GetHRP()
+            if myHRP and hrp and hrp.Parent then
+                local dist = math.floor((myHRP.Position - hrp.Position).Magnitude)
+                distLbl.Text = dist .. " studs"
+                box.Color3   = CFG.ESPColor
+                box.SurfaceColor3 = CFG.ESPColor
+                nameLbl.TextColor3 = CFG.ESPColor
+            end
+        end)
+    end
+
+    if player.Character then BuildForChar(player.Character) end
+    player.CharacterAdded:Connect(BuildForChar)
+end
+
+-- ESP toggle handler
+local function SetESP(enabled)
+    CFG.ESPEnabled = enabled
+    if enabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            AddESP(p)
+        end
+        Players.PlayerAdded:Connect(AddESP)
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            RemoveESP(p)
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+-- ══════════════════════════════════════════════════════
+--  INVISIBLE SYSTEM
+-- ══════════════════════════════════════════════════════
+local originalTransparency = {}
+
+local function SetInvisible(enabled)
+    CFG.InvisEnabled = enabled
+    local char = GetChar()
+    if not char then return end
+
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if enabled then
+                -- Originaltransparenz merken
+                if originalTransparency[part] == nil then
+                    originalTransparency[part] = part.Transparency
+                end
+                part.Transparency = CFG.InvisTrans
+            else
+                -- Originalwert wiederherstellen (kein Duplikat!)
+                if originalTransparency[part] ~= nil then
+                    part.Transparency = originalTransparency[part]
+                    originalTransparency[part] = nil
+                else
+                    part.Transparency = 0
+                end
+            end
+        end
+    end
+end
+
+-- ══════════════════════════════════════════════════════
+--  GUI AUFBAUEN
+-- ══════════════════════════════════════════════════════
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "BrainrotAdminV4"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent         = PlayerGui
+
+-- Haupt-Frame
+local Main = Instance.new("Frame")
+Main.Name              = "Main"
+Main.Size              = UDim2.new(0, 620, 0, 430)
+Main.Position          = UDim2.new(0.5, -310, 0.5, -215)
+Main.BackgroundColor3  = Color3.fromRGB(9, 9, 24)
+Main.BorderSizePixel   = 0
+Main.ClipsDescendants  = true
+Main.Parent            = ScreenGui
+
+local function UICorner(p, r) local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,r or 12) c.Parent=p return c end
+local function UIStroke(p, col, th) local s=Instance.new("UIStroke") s.Color=col or Color3.fromRGB(80,30,180) s.Thickness=th or 1.5 s.Parent=p return s end
+local function UIPad(p, t, l, r, b) local pad=Instance.new("UIPadding") pad.PaddingTop=UDim.new(0,t or 8) pad.PaddingLeft=UDim.new(0,l or 10) pad.PaddingRight=UDim.new(0,r or 10) pad.PaddingBottom=UDim.new(0,b or 8) pad.Parent=p return pad end
+
+UICorner(Main, 16)
+UIStroke(Main, Color3.fromRGB(80, 30, 180), 1.5)
+
+-- ── GLOW ANIMATION ──────────────────────────────────
+local mainStroke = Main:FindFirstChildWhichIsA("UIStroke")
+if mainStroke then
+    task.spawn(function()
+        while Main.Parent do
+            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {
+                Color = Color3.fromRGB(150, 60, 255)
+            }):Play()
+            task.wait(2)
+            TweenService:Create(mainStroke, TweenInfo.new(2, Enum.EasingStyle.Sine), {
+                Color = Color3.fromRGB(60, 20, 150)
+            }):Play()
+            task.wait(2)
+        end
+    end)
+end
+
+-- ── NAV (links) ──────────────────────────────────────
+local Nav = Instance.new("Frame")
+Nav.Name             = "Nav"
+Nav.Size             = UDim2.new(0, 68, 1, 0)
+Nav.BackgroundColor3 = Color3.fromRGB(5, 5, 14)
+Nav.BorderSizePixel  = 0
+Nav.Parent           = Main
+
+UIStroke(Nav, Color3.fromRGB(40, 25, 80), 1)
+
+local NavLogo = Instance.new("TextLabel")
+NavLogo.Size              = UDim2.new(1, 0, 0, 36)
+NavLogo.Position          = UDim2.new(0, 0, 0, 8)
+NavLogo.BackgroundTransparency = 1
+NavLogo.Text              = "🧠"
+NavLogo.TextSize          = 22
+NavLogo.Font              = Enum.Font.GothamBold
+NavLogo.Parent            = Nav
+
+-- ── PANEL CONTAINER (rechts) ──────────────────────────
+local PanelHolder = Instance.new("Frame")
+PanelHolder.Name               = "PanelHolder"
+PanelHolder.Size               = UDim2.new(1, -68, 1, 0)
+PanelHolder.Position           = UDim2.new(0, 68, 0, 0)
+PanelHolder.BackgroundTransparency = 1
+PanelHolder.ClipsDescendants   = true
+PanelHolder.Parent             = Main
+
+-- ════════════════════════════════════════════════════
+-- PANEL + NAV BUTTON FACTORY
+-- ════════════════════════════════════════════════════
+local allNavBtns   = {}
+local allPanels    = {}
+local activePanel  = nil
+
+local function MakeNavBtn(icon, lbl, yPos, goldMode)
+    local Btn = Instance.new("TextButton")
+    Btn.Size               = UDim2.new(0, 50, 0, 52)
+    Btn.Position           = UDim2.new(0.5, -25, 0, yPos)
+    Btn.BackgroundTransparency = 1
+    Btn.BackgroundColor3   = Color3.fromRGB(18, 12, 40)
+    Btn.Text               = ""
+    Btn.BorderSizePixel    = 0
+    Btn.Parent             = Nav
+    UICorner(Btn, 12)
+    local stroke = UIStroke(Btn, Color3.fromRGB(38, 24, 80), 1)
+
+    local ico = Instance.new("TextLabel")
+    ico.Size = UDim2.new(1, 0, 0, 24) ico.Position = UDim2.new(0, 0, 0, 6)
+    ico.BackgroundTransparency = 1 ico.Text = icon
+    ico.TextSize = 17 ico.Font = Enum.Font.GothamBold ico.Parent = Btn
+
+    local lb = Instance.new("TextLabel")
+    lb.Size = UDim2.new(1, 0, 0, 13) lb.Position = UDim2.new(0, 0, 0, 31)
+    lb.BackgroundTransparency = 1 lb.Text = lbl
+    lb.TextSize = 8 lb.Font = Enum.Font.GothamBold
+    lb.TextColor3 = Color3.fromRGB(45, 35, 80) lb.Parent = Btn
+
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(0, 3, 0, 28) bar.Position = UDim2.new(0, -1, 0.5, -14)
+    bar.BackgroundColor3 = goldMode and Color3.fromRGB(245,158,11) or Color3.fromRGB(168,85,247)
+    bar.BorderSizePixel = 0 bar.Visible = false bar.Parent = Btn
+    UICorner(bar, 3)
+
+    local activeColor = goldMode and Color3.fromRGB(245,158,11) or Color3.fromRGB(168,85,247)
+    local activeBG    = goldMode and Color3.fromRGB(30,18,4) or Color3.fromRGB(22,12,45)
+
+    local function SetActive(on)
+        TweenService:Create(Btn, TweenInfo.new(0.18), {
+            BackgroundTransparency = on and 0 or 1,
+            BackgroundColor3 = activeBG
+        }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.18), {
+            Color = on and activeColor or Color3.fromRGB(38,24,80)
+        }):Play()
+        lb.TextColor3 = on and activeColor or Color3.fromRGB(45,35,80)
+        bar.Visible   = on
+    end
+
+    return Btn, SetActive
+end
+
+local function MakeScrollPanel()
+    local P = Instance.new("ScrollingFrame")
+    P.Size                 = UDim2.new(1, 0, 1, 0)
+    P.BackgroundTransparency = 1
+    P.BorderSizePixel      = 0
+    P.ScrollBarThickness   = 3
+    P.ScrollBarImageColor3 = Color3.fromRGB(100,50,200)
+    P.CanvasSize           = UDim2.new(0, 0, 0, 0)
+    P.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+    P.Visible              = false
+    P.Parent               = PanelHolder
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 8) layout.SortOrder = Enum.SortOrder.LayoutOrder layout.Parent = P
+    UIPad(P, 10, 12, 12, 12)
+    return P
+end
+
+local function SwitchPanel(targetPanel, targetSetActive)
+    for _, data in ipairs(allPanels) do
+        data.panel.Visible = false
+        data.setActive(false)
+    end
+    targetPanel.Visible = true
+    targetSetActive(true)
+end
+
+-- ════════════════════════════════════════════════════
+-- CARD + TOGGLE HELPERS
+-- ════════════════════════════════════════════════════
+local function MakeCard(parent, order)
+    local F = Instance.new("Frame")
+    F.LayoutOrder = order or 0
+    F.Size = UDim2.new(1, 0, 0, 0) F.AutomaticSize = Enum.AutomaticSize.Y
+    F.BackgroundColor3 = Color3.fromRGB(13, 12, 34) F.BorderSizePixel = 0 F.Parent = parent
+    UICorner(F, 10) UIStroke(F, Color3.fromRGB(45, 30, 95), 1)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 6) layout.SortOrder = Enum.SortOrder.LayoutOrder layout.Parent = F
+    UIPad(F, 10, 12, 12, 10)
+    return F
+end
+
+local function MakeSwitch(parent, defaultOn)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0, 44, 0, 22)
+    bg.BackgroundColor3 = defaultOn and Color3.fromRGB(100,40,220) or Color3.fromRGB(40,32,70)
+    bg.BorderSizePixel = 0 bg.Parent = parent
+    UICorner(bg, 100)
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16) knob.Position = defaultOn and UDim2.new(0,25,0.5,-8) or UDim2.new(0,3,0.5,-8)
+    knob.BackgroundColor3 = Color3.fromRGB(255,255,255) knob.BorderSizePixel = 0 knob.Parent = bg
+    UICorner(knob, 100)
+    local state = defaultOn or false
+    local function Toggle(forcedState)
+        state = forcedState ~= nil and forcedState or not state
+        local col = state and Color3.fromRGB(120,50,240) or Color3.fromRGB(40,32,70)
+        local pos = state and UDim2.new(0,25,0.5,-8) or UDim2.new(0,3,0.5,-8)
+        TweenService:Create(bg,   TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {BackgroundColor3=col}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position=pos}):Play()
+        return state
+    end
+    return bg, knob, Toggle, function() return state end
+end
+
+local function MakeToggleRow(parent, icon, label, desc, order, defaultOn, goldMode, callback)
+    local Row = Instance.new("Frame")
+    Row.LayoutOrder = order or 0 Row.Size = UDim2.new(1, 0, 0, 46)
+    Row.BackgroundTransparency = 1 Row.Parent = parent
+
+    local hl = Instance.new("UIListLayout")
+    hl.FillDirection = Enum.FillDirection.Horizontal
+    hl.VerticalAlignment = Enum.VerticalAlignment.Center
+    hl.Padding = UDim.new(0, 8) hl.Parent = Row
+
+    local icoLbl = Instance.new("TextLabel")
+    icoLbl.Size = UDim2.new(0, 28, 1, 0) icoLbl.BackgroundTransparency = 1
+    icoLbl.Text = icon icoLbl.TextSize = 17 icoLbl.Font = Enum.Font.GothamBold icoLbl.Parent = Row
+
+    local textCol = Instance.new("Frame")
+    textCol.Size = UDim2.new(1, -80, 1, 0) textCol.BackgroundTransparency = 1 textCol.Parent = Row
+    local tl = Instance.new("UIListLayout") tl.VerticalAlignment = Enum.VerticalAlignment.Center tl.Padding = UDim.new(0,2) tl.Parent = textCol
+
+    local mainLbl = Instance.new("TextLabel")
+    mainLbl.Size = UDim2.new(1,0,0,16) mainLbl.BackgroundTransparency = 1
+    mainLbl.Text = label mainLbl.TextSize = 13 mainLbl.Font = Enum.Font.GothamBold
+    mainLbl.TextColor3 = Color3.fromRGB(220,210,255) mainLbl.TextXAlignment = Enum.TextXAlignment.Left mainLbl.Parent = textCol
+
+    if desc then
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Size = UDim2.new(1,0,0,13) descLbl.BackgroundTransparency = 1
+        descLbl.Text = desc descLbl.TextSize = 11 descLbl.Font = Enum.Font.Gotham
+        descLbl.TextColor3 = Color3.fromRGB(100,85,140) descLbl.TextXAlignment = Enum.TextXAlignment.Left descLbl.Parent = textCol
+    end
+
+    local swBg, swKnob, swToggle, swGet = MakeSwitch(Row, defaultOn)
+    if goldMode then
+        swBg.BackgroundColor3 = defaultOn and Color3.fromRGB(180,100,10) or Color3.fromRGB(60,40,10)
+    end
+
+    -- Clickable overlay
+    local clickBtn = Instance.new("TextButton")
+    clickBtn.Size = UDim2.new(1,0,1,0) clickBtn.BackgroundTransparency = 1 clickBtn.Text = ""
+    clickBtn.ZIndex = 5 clickBtn.Parent = Row
+    clickBtn.MouseButton1Click:Connect(function()
+        local newState = swToggle()
+        if callback then callback(newState) end
+    end)
+
+    return Row, swToggle, swGet
+end
+
+local function MakeButton(parent, text, colorA, colorB, order, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.LayoutOrder = order or 0
+    Btn.Size = UDim2.new(1, 0, 0, 38)
+    Btn.BackgroundColor3 = colorA
+    Btn.Text = text Btn.TextColor3 = Color3.fromRGB(255,255,255)
+    Btn.TextSize = 13 Btn.Font = Enum.Font.GothamBold
+    Btn.BorderSizePixel = 0 Btn.Parent = parent
+    UICorner(Btn, 10)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, colorA),
+        ColorSequenceKeypoint.new(1, colorB)
+    })
+    grad.Rotation = 135 grad.Parent = Btn
+    Btn.MouseButton1Click:Connect(function()
+        TweenService:Create(Btn, TweenInfo.new(0.08), {Size=UDim2.new(0.98,0,0,36)}):Play()
+        task.wait(0.08)
+        TweenService:Create(Btn, TweenInfo.new(0.12), {Size=UDim2.new(1,0,0,38)}):Play()
+        if callback then callback() end
+    end)
+    Btn.MouseEnter:Connect(function()
+        TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = colorB}):Play()
+    end)
+    Btn.MouseLeave:Connect(function()
+        TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = colorA}):Play()
+    end)
+    return Btn
+end
+
+local function MakeStat(parent, val, lbl, color)
+    local Box = Instance.new("Frame")
+    Box.Size = UDim2.new(0, 1, 0, 60) Box.AutomaticSize = Enum.AutomaticSize.X
+    Box.BackgroundColor3 = Color3.fromRGB(6,6,18) Box.BorderSizePixel = 0 Box.Parent = parent
+    UICorner(Box, 10) UIStroke(Box, Color3.fromRGB(40,28,80), 1)
+    UIPad(Box, 8, 14, 14, 6)
+    local vl = Instance.new("UIListLayout") vl.HorizontalAlignment = Enum.HorizontalAlignment.Center vl.VerticalAlignment = Enum.VerticalAlignment.Center vl.Parent = Box
+    local vLbl = Instance.new("TextLabel") vLbl.BackgroundTransparency = 1 vLbl.Text = tostring(val) vLbl.TextSize = 20 vLbl.Font = Enum.Font.GothamBold vLbl.TextColor3 = color or Color3.fromRGB(168,85,247) vLbl.Parent = Box
+    local nLbl = Instance.new("TextLabel") nLbl.BackgroundTransparency = 1 nLbl.Text = lbl nLbl.TextSize = 9 nLbl.Font = Enum.Font.GothamBold nLbl.TextColor3 = Color3.fromRGB(80,65,110) nLbl.Parent = Box
+    return Box, vLbl
+end
+
+-- ════════════════════════════════════════════════════
+-- PANEL 1: BESTEN STEHLEN (👑)
+-- ════════════════════════════════════════════════════
+local P_Best = MakeScrollPanel()
+local nb_best, setActive_best = MakeNavBtn("👑", "BEST", 58, true)
+
+-- Header
+do
+    local hdr = Instance.new("Frame")
+    hdr.LayoutOrder = 0 hdr.Size = UDim2.new(1,0,0,44) hdr.BackgroundColor3 = Color3.fromRGB(35,18,5) hdr.BorderSizePixel = 0 hdr.Parent = P_Best
+    UICorner(hdr, 10) UIStroke(hdr, Color3.fromRGB(180,100,10), 1)
+    UIPad(hdr, 0, 14, 14, 0)
+    local hl = Instance.new("UIListLayout") hl.FillDirection = Enum.FillDirection.Horizontal hl.VerticalAlignment = Enum.VerticalAlignment.Center hl.Padding = UDim.new(0,8) hl.Parent = hdr
+    local icoL = Instance.new("TextLabel") icoL.BackgroundTransparency=1 icoL.Text="👑" icoL.TextSize=20 icoL.Font=Enum.Font.GothamBold icoL.Size=UDim2.new(0,28,1,0) icoL.Parent=hdr
+    local titl = Instance.new("TextLabel") titl.BackgroundTransparency=1 titl.Text="Besten Brainrot klauen" titl.TextSize=14 titl.Font=Enum.Font.GothamBold titl.TextColor3=Color3.fromRGB(245,190,60) titl.TextXAlignment=Enum.TextXAlignment.Left titl.Size=UDim2.new(1,-36,1,0) titl.Parent=hdr
+end
+
+-- Auto Steal Best Toggle
+local bestCard = MakeCard(P_Best, 1)
+local bestAutoRow, bestAutoToggle, bestAutoGet = MakeToggleRow(
+    bestCard, "🤖", "Auto: Immer Besten klauen",
+    "TP zu #1 Spieler & klaut alle seine Brainrots", 0, false, true,
+    function(on)
+        CFG.AutoStealBest = on
+    end
+)
+
+-- Steal Best 1x Button
+MakeButton(P_Best,
+    "👑  Jetzt Besten stehlen (1x)",
+    Color3.fromRGB(160, 90, 10),
+    Color3.fromRGB(220, 140, 20),
+    2,
+    function()
+        local richest = GetRichestPlayer()
+        if not richest then
+            -- Fallback: stehle aus Workspace
+            local best = FindBestBrainrot()
+            if best then DoSteal(best) end
+            return
+        end
+        local hrp = GetHRP()
+        if not hrp then return end
+        local rhrp = richest.Character and richest.Character:FindFirstChild("HumanoidRootPart")
+        if rhrp then
+            hrp.CFrame = rhrp.CFrame * CFrame.new(0, 0, -3)
+        end
+        task.wait(0.1)
+        for _, tool in ipairs(richest.Backpack:GetChildren()) do
+            pcall(function() tool.Parent = LocalPlayer.Backpack end)
+            stealCount = stealCount + 1
+        end
+        if richest.Character then
+            for _, tool in ipairs(richest.Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    pcall(function() tool.Parent = LocalPlayer.Backpack end)
+                    stealCount = stealCount + 1
+                end
+            end
+        end
+        if CFG.AutoTP then TeleportToSpawn() end
+    end
+)
+
+-- Spieler Liste Info
+local listCard = MakeCard(P_Best, 3)
+MakeLabel(listCard, "📋  Server Spieler", 14, Color3.fromRGB(200,190,240), 0)
+
+-- Spieler-Liste dynamisch
+local playerListFrame = Instance.new("Frame")
+playerListFrame.LayoutOrder = 1
+playerListFrame.Size = UDim2.new(1,0,0,0) playerListFrame.AutomaticSize = Enum.AutomaticSize.Y
+playerListFrame.BackgroundTransparency = 1 playerListFrame.Parent = listCard
+local plLayout = Instance.new("UIListLayout") plLayout.Padding = UDim.new(0,5) plLayout.Parent = playerListFrame
+
+local function RefreshPlayerList()
+    for _, c in ipairs(playerListFrame:GetChildren()) do
+        if not c:IsA("UIListLayout") then c:Destroy() end
+    end
+    local allP = Players:GetPlayers()
+    for _, p in ipairs(allP) do
+        if p ~= LocalPlayer then
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1,0,0,34) row.BackgroundColor3 = Color3.fromRGB(8,7,22) row.BorderSizePixel = 0 row.Parent = playerListFrame
+            UICorner(row, 8) UIStroke(row, Color3.fromRGB(40,28,80), 1)
+            local rl = Instance.new("UIListLayout") rl.FillDirection = Enum.FillDirection.Horizontal rl.VerticalAlignment = Enum.VerticalAlignment.Center rl.Padding = UDim.new(0,6) rl.Parent = row
+            UIPad(row, 0, 8, 8, 0)
+            local nl = Instance.new("TextLabel") nl.BackgroundTransparency=1 nl.Text=p.Name nl.TextSize=12 nl.Font=Enum.Font.GothamBold nl.TextColor3=Color3.fromRGB(210,200,255) nl.TextXAlignment=Enum.TextXAlignment.Left nl.Size=UDim2.new(1,-90,1,0) nl.Parent=row
+            local stealBtn = Instance.new("TextButton")
+            stealBtn.Size = UDim2.new(0,72,0,24) stealBtn.BackgroundColor3 = Color3.fromRGB(100,40,200) stealBtn.Text = "💰 STEAL" stealBtn.TextSize=11 stealBtn.Font=Enum.Font.GothamBold stealBtn.TextColor3=Color3.fromRGB(255,255,255) stealBtn.BorderSizePixel=0 stealBtn.Parent=row
+            UICorner(stealBtn, 6)
+            stealBtn.MouseButton1Click:Connect(function()
+                local hrp = GetHRP()
+                if not hrp then return end
+                local tChar = p.Character
+                if tChar then
+                    local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                    if tHRP then hrp.CFrame = tHRP.CFrame * CFrame.new(0,0,-3) end
+                    task.wait(0.1)
+                    for _, tool in ipairs(p.Backpack:GetChildren()) do
+                        pcall(function() tool.Parent = LocalPlayer.Backpack end)
+                    end
+                    for _, tool in ipairs(tChar:GetChildren()) do
+                        if tool:IsA("Tool") then pcall(function() tool.Parent = LocalPlayer.Backpack end) end
+                    end
+                    if CFG.AutoTP then TeleportToSpawn() end
+                end
+            end)
+        end
+    end
+end
+
+RefreshPlayerList()
+Players.PlayerAdded:Connect(RefreshPlayerList)
+Players.PlayerRemoving:Connect(RefreshPlayerList)
+
+-- ════════════════════════════════════════════════════
+-- PANEL 2: AUTO STEAL ALL (💰)
+-- ════════════════════════════════════════════════════
+local P_Steal = MakeScrollPanel()
+local nb_steal, setActive_steal = MakeNavBtn("💰", "STEAL", 116, false)
+
+-- Stats Row
+local statsRow = Instance.new("Frame")
+statsRow.LayoutOrder = 0 statsRow.Size = UDim2.new(1,0,0,65) statsRow.BackgroundTransparency = 1 statsRow.Parent = P_Steal
+local srLayout = Instance.new("UIListLayout") srLayout.FillDirection = Enum.FillDirection.Horizontal srLayout.Padding = UDim.new(0,7) srLayout.Parent = statsRow
+
+local _, stealCountLbl = MakeStat(statsRow, "0",  "GESTOHLEN", Color3.fromRGB(168,85,247))
+local _, stealRadiusLbl= MakeStat(statsRow, "10", "RADIUS",    Color3.fromRGB(56,189,248))
+local _, stealCdLbl    = MakeStat(statsRow, "1s", "COOLDOWN",  Color3.fromRGB(251,191,36))
+
+-- Heartbeat update für Stats
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        stealCountLbl.Text  = tostring(stealCount)
+        stealRadiusLbl.Text = tostring(CFG.StealRadius)
+        stealCdLbl.Text     = string.format("%.1fs", CFG.StealCooldown)
+    end)
+end)
+
+-- Auto Steal All Toggle
+local stealCard = MakeCard(P_Steal, 1)
+local stealAllRow, stealAllToggle, stealAllGet = MakeToggleRow(
+    stealCard, "🌀", "Auto Steal – ALLE Brainrots",
+    "Scannt Server & klaut jeden Brainrot automatisch", 0, false, false,
+    function(on)
+        CFG.AutoStealAll = on
+    end
+)
+
+-- Radius Slider
+local radSliderRow = Instance.new("Frame")
+radSliderRow.LayoutOrder = 1 radSliderRow.Size = UDim2.new(1,0,0,36) radSliderRow.BackgroundTransparency = 1 radSliderRow.Parent = stealCard
+local rsl = Instance.new("UIListLayout") rsl.FillDirection = Enum.FillDirection.Horizontal rsl.VerticalAlignment = Enum.VerticalAlignment.Center rsl.Padding = UDim.new(0,8) rsl.Parent = radSliderRow
+local rLbl = Instance.new("TextLabel") rLbl.BackgroundTransparency=1 rLbl.Text="📏 Radius: 10" rLbl.TextSize=12 rLbl.Font=Enum.Font.GothamBold rLbl.TextColor3=Color3.fromRGB(150,130,200) rLbl.TextXAlignment=Enum.TextXAlignment.Left rLbl.Size=UDim2.new(0.55,0,1,0) rLbl.Parent=radSliderRow
+
+-- Radius +/- Buttons
+local radMinus = Instance.new("TextButton") radMinus.Size=UDim2.new(0,28,0,26) radMinus.BackgroundColor3=Color3.fromRGB(50,40,90) radMinus.Text="-" radMinus.TextSize=16 radMinus.Font=Enum.Font.GothamBold radMinus.TextColor3=Color3.fromRGB(200,180,255) radMinus.BorderSizePixel=0 radMinus.Parent=radSliderRow
+UICorner(radMinus, 7)
+radMinus.MouseButton1Click:Connect(function() CFG.StealRadius = math.max(3, CFG.StealRadius - 1) rLbl.Text = "📏 Radius: "..CFG.StealRadius end)
+
+local radPlus = Instance.new("TextButton") radPlus.Size=UDim2.new(0,28,0,26) radPlus.BackgroundColor3=Color3.fromRGB(80,40,160) radPlus.Text="+" radPlus.TextSize=16 radPlus.Font=Enum.Font.GothamBold radPlus.TextColor3=Color3.fromRGB(220,200,255) radPlus.BorderSizePixel=0 radPlus.Parent=radSliderRow
+UICorner(radPlus, 7)
+radPlus.MouseButton1Click:Connect(function() CFG.StealRadius = math.min(50, CFG.StealRadius + 1) rLbl.Text = "📏 Radius: "..CFG.StealRadius end)
+
+-- AutoTP Toggle
+local autoTPRow, autoTPToggle, autoTPGet = MakeToggleRow(
+    stealCard, "🏠", "Auto-TP nach Steal",
+    "Teleportiert nach jedem Steal zu deinem Spawn", 2, true, false,
+    function(on) CFG.AutoTP = on end
+)
+
+-- Steal All jetzt Button
+MakeButton(P_Steal, "⚡  ALLE Brainrots jetzt klauen",
+    Color3.fromRGB(50,160,90), Color3.fromRGB(30,120,60), 2,
+    function()
+        local brainrots = FindAllBrainrots()
+        local count = 0
+        for _, obj in ipairs(brainrots) do
+            local ok = DoSteal(obj)
+            if ok then count = count + 1 end
+            task.wait(0.15)
+        end
+    end
+)
+
+-- ════════════════════════════════════════════════════
+-- PANEL 3: ESP (👁️)
+-- ════════════════════════════════════════════════════
+local P_ESP = MakeScrollPanel()
+local nb_esp, setActive_esp = MakeNavBtn("👁️", "ESP", 174, false)
+
+local espCard = MakeCard(P_ESP, 0)
+MakeToggleRow(espCard, "📡", "Players ESP", "Spieler durch Wände sehen", 0, false, false,
+    function(on) SetESP(on) end)
+
+-- ESP Farbe
+local colorCard = MakeCard(P_ESP, 1)
+MakeLabel(colorCard, "🎨  ESP Farbe", 14, Color3.fromRGB(200,190,240), 0)
+
+local colorRow = Instance.new("Frame")
+colorRow.LayoutOrder = 1 colorRow.Size = UDim2.new(1,0,0,28) colorRow.BackgroundTransparency = 1 colorRow.Parent = colorCard
+local cl = Instance.new("UIListLayout") cl.FillDirection = Enum.FillDirection.Horizontal cl.VerticalAlignment = Enum.VerticalAlignment.Center cl.Padding = UDim.new(0,7) cl.Parent = colorRow
+
+local espColors = {
+    Color3.fromRGB(244,63,94),
+    Color3.fromRGB(16,217,160),
+    Color3.fromRGB(56,189,248),
+    Color3.fromRGB(245,158,11),
+    Color3.fromRGB(168,85,247),
+    Color3.fromRGB(251,146,60),
+}
+for _, col in ipairs(espColors) do
+    local chip = Instance.new("TextButton") chip.Size=UDim2.new(0,26,0,20) chip.BackgroundColor3=col chip.Text="" chip.BorderSizePixel=0 chip.Parent=colorRow
+    UICorner(chip, 5)
+    chip.MouseButton1Click:Connect(function()
+        CFG.ESPColor = col
+        for p, objs in pairs(ESPObjects) do
+            for _, obj in ipairs(objs) do
+                if obj:IsA("SelectionBox") then
+                    obj.Color3 = col obj.SurfaceColor3 = col
+                end
+            end
+        end
+    end)
+end
+
+MakeToggleRow(MakeCard(P_ESP, 2), "🏷️", "Nametags", "Namen + Distanz über Spielern", 0, true, false,
+    function(on) CFG.ShowNames = on end)
+
+-- ════════════════════════════════════════════════════
+-- PANEL 4: UNSICHTBAR (👻)
+-- ════════════════════════════════════════════════════
+local P_Invis = MakeScrollPanel()
+local nb_invis, setActive_invis = MakeNavBtn("👻", "INVIS", 232, false)
+
+local invisCard = MakeCard(P_Invis, 0)
+MakeToggleRow(invisCard, "🫥", "Transparent werden",
+    "Alle Körperteile unsichtbar machen", 0, false, false,
+    function(on) SetInvisible(on) end)
+
+-- Info
+local infoCard = MakeCard(P_Invis, 1)
+local infoLbl = Instance.new("TextLabel")
+infoLbl.LayoutOrder = 0 infoLbl.Size = UDim2.new(1,0,0,0) infoLbl.AutomaticSize = Enum.AutomaticSize.Y
+infoLbl.BackgroundTransparency = 1 infoLbl.Text = "✅ Beim Deaktivieren wird dein Charakter sauber wieder sichtbar – kein Duplikat, keine Fehler."
+infoLbl.TextSize = 11 infoLbl.Font = Enum.Font.Gotham infoLbl.TextColor3 = Color3.fromRGB(90,80,130)
+infoLbl.TextXAlignment = Enum.TextXAlignment.Left infoLbl.TextWrapped = true infoLbl.Parent = infoCard
+
+-- ════════════════════════════════════════════════════
+-- PANEL 5: SPAWN (🏠)
+-- ════════════════════════════════════════════════════
+local P_Spawn = MakeScrollPanel()
+local nb_spawn, setActive_spawn = MakeNavBtn("🏠", "SPAWN", 290, false)
+
+-- Aktuelle Position
+local posCard = MakeCard(P_Spawn, 0)
+local posLbl = MakeLabel(posCard, "📍  Position wird geladen...", 13, Color3.fromRGB(16,217,160), 0)
+posLbl.TextColor3 = Color3.fromRGB(16, 217, 160)
+
+-- Position live updaten
+RunService.Heartbeat:Connect(function()
+    local hrp = GetHRP()
+    if hrp then
+        local p = hrp.Position
+        pcall(function()
+            posLbl.Text = string.format("X: %.1f  Y: %.1f  Z: %.1f", p.X, p.Y, p.Z)
+        end)
+    end
+end)
+
+-- Spawn speichern Button
+MakeButton(posCard,
+    "📌  Diesen Ort als Base speichern",
+    Color3.fromRGB(10,130,80),
+    Color3.fromRGB(8,100,60), 1,
+    function()
+        SaveSpawn()
+        if CFG.SpawnCFrame then
+            local p = CFG.SpawnCFrame.Position
+            posLbl.Text = string.format("✅ Base: %.1f, %.1f, %.1f", p.X, p.Y, p.Z)
+        end
+    end
+)
+
+-- Teleport Button
+MakeButton(P_Spawn,
+    "⚡  Teleport zu Base",
+    Color3.fromRGB(10, 80, 180),
+    Color3.fromRGB(8, 50, 140), 1,
+    function() TeleportToSpawn() end
+)
+
+-- ════════════════════════════════════════════════════
+-- TAB SWITCHING
+-- ════════════════════════════════════════════════════
+local tabs = {
+    {btn=nb_best,  setA=setActive_best,  panel=P_Best},
+    {btn=nb_steal, setA=setActive_steal, panel=P_Steal},
+    {btn=nb_esp,   setA=setActive_esp,   panel=P_ESP},
+    {btn=nb_invis, setA=setActive_invis, panel=P_Invis},
+    {btn=nb_spawn, setA=setActive_spawn, panel=P_Spawn},
+}
+
+local function SwitchTab(targetData)
+    for _, t in ipairs(tabs) do
+        t.panel.Visible = false
+        t.setA(false)
+    end
+    targetData.panel.Visible = true
+    targetData.setA(true)
+end
+
+for _, t in ipairs(tabs) do
+    local td = t
+    t.btn.MouseButton1Click:Connect(function() SwitchTab(td) end)
+end
+
+-- Start auf Best Tab
+SwitchTab(tabs[1])
+
+-- ════════════════════════════════════════════════════
+-- CLOSE / OPEN TOGGLE
+-- ════════════════════════════════════════════════════
+local navX = Instance.new("TextButton")
+navX.Size = UDim2.new(0, 40, 0, 36)
+navX.Position = UDim2.new(0.5, -20, 1, -48)
+navX.BackgroundColor3 = Color3.fromRGB(35, 15, 60)
+navX.Text = "✕" navX.TextSize = 14 navX.Font = Enum.Font.GothamBold
+navX.TextColor3 = Color3.fromRGB(220, 80, 100) navX.BorderSizePixel = 0 navX.Parent = Nav
+UICorner(navX, 10) UIStroke(navX, Color3.fromRGB(140, 30, 60), 1)
+
+-- Toggle open button (klein, immer sichtbar)
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 130, 0, 34)
+ToggleBtn.Position = UDim2.new(0, 14, 1, -50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 140)
+ToggleBtn.Text = "🧠 Brainrot GUI" ToggleBtn.TextSize = 12 ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.BorderSizePixel = 0 ToggleBtn.Visible = false ToggleBtn.Parent = ScreenGui
+UICorner(ToggleBtn, 10)
+
+-- Glow Toggle Button
+task.spawn(function()
+    while ToggleBtn.Parent do
+        TweenService:Create(ToggleBtn, TweenInfo.new(1.5,Enum.EasingStyle.Sine), {BackgroundColor3=Color3.fromRGB(100,40,220)}):Play()
+        task.wait(1.5)
+        TweenService:Create(ToggleBtn, TweenInfo.new(1.5,Enum.EasingStyle.Sine), {BackgroundColor3=Color3.fromRGB(60,20,140)}):Play()
+        task.wait(1.5)
+    end
+end)
+
+local guiOpen = true
+
+local function CloseGUI()
+    guiOpen = false
+    TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+    task.wait(0.3)
+    Main.Visible    = false
+    ToggleBtn.Visible = true
+    Main.Size     = UDim2.new(0, 620, 0, 430)
+    Main.Position = UDim2.new(0.5, -310, 0.5, -215)
+end
+
+local function OpenGUI()
+    guiOpen = true
+    Main.Visible = true
+    ToggleBtn.Visible = false
+    Main.Size     = UDim2.new(0, 0, 0, 0)
+    Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    TweenService:Create(Main, TweenInfo.new(0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 620, 0, 430),
+        Position = UDim2.new(0.5, -310, 0.5, -215)
+    }):Play()
+end
+
+navX.MouseButton1Click:Connect(CloseGUI)
+ToggleBtn.MouseButton1Click:Connect(OpenGUI)
+
+-- ════════════════════════════════════════════════════
+-- DRAGGABLE
+-- ════════════════════════════════════════════════════
+local dragging, dragStart, startPos = false, nil, nil
+Nav.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true dragging = true
+        dragStart = input.Position startPos = Main.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
     if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(
+        Main.Position = UDim2.new(
             startPos.X.Scale, startPos.X.Offset + delta.X,
             startPos.Y.Scale, startPos.Y.Offset + delta.Y
         )
     end
 end)
-TitleBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
 
--- ================================================
--- HELPER: TOGGLE BUTTON ERSTELLEN
--- ================================================
-local function CreateToggleButton(parent, yPos, icon, label, callback)
-    local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -20, 0, 55)
-    Container.Position = UDim2.new(0, 10, 0, yPos)
-    Container.BackgroundColor3 = Color3.fromRGB(25, 20, 45)
-    Container.BorderSizePixel = 0
-    Container.Parent = parent
-
-    local ContCorner = Instance.new("UICorner")
-    ContCorner.CornerRadius = UDim.new(0, 10)
-    ContCorner.Parent = Container
-
-    local ContStroke = Instance.new("UIStroke")
-    ContStroke.Color = Color3.fromRGB(60, 40, 120)
-    ContStroke.Thickness = 1
-    ContStroke.Parent = Container
-
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(0, 40, 1, 0)
-    IconLabel.Position = UDim2.new(0, 5, 0, 0)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = icon
-    IconLabel.TextSize = 22
-    IconLabel.Font = Enum.Font.GothamBold
-    IconLabel.Parent = Container
-
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Size = UDim2.new(1, -110, 1, 0)
-    NameLabel.Position = UDim2.new(0, 50, 0, 0)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = label
-    NameLabel.TextColor3 = Color3.fromRGB(220, 210, 255)
-    NameLabel.TextSize = 15
-    NameLabel.Font = Enum.Font.Gotham
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    NameLabel.Parent = Container
-
-    -- Toggle Switch
-    local ToggleBg = Instance.new("Frame")
-    ToggleBg.Size = UDim2.new(0, 50, 0, 26)
-    ToggleBg.Position = UDim2.new(1, -60, 0.5, -13)
-    ToggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    ToggleBg.BorderSizePixel = 0
-    ToggleBg.Parent = Container
-
-    local ToggleBgCorner = Instance.new("UICorner")
-    ToggleBgCorner.CornerRadius = UDim.new(1, 0)
-    ToggleBgCorner.Parent = ToggleBg
-
-    local ToggleKnob = Instance.new("Frame")
-    ToggleKnob.Size = UDim2.new(0, 20, 0, 20)
-    ToggleKnob.Position = UDim2.new(0, 3, 0.5, -10)
-    ToggleKnob.BackgroundColor3 = Color3.fromRGB(150, 130, 200)
-    ToggleKnob.BorderSizePixel = 0
-    ToggleKnob.Parent = ToggleBg
-
-    local KnobCorner = Instance.new("UICorner")
-    KnobCorner.CornerRadius = UDim.new(1, 0)
-    KnobCorner.Parent = ToggleKnob
-
-    local isOn = false
-
-    local function SetToggle(state)
-        isOn = state
-        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        if isOn then
-            TweenService:Create(ToggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(120, 60, 255)}):Play()
-            TweenService:Create(ToggleKnob, tweenInfo, {Position = UDim2.new(0, 27, 0.5, -10), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-            TweenService:Create(ContStroke, tweenInfo, {Color = Color3.fromRGB(120, 60, 255)}):Play()
-        else
-            TweenService:Create(ToggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
-            TweenService:Create(ToggleKnob, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -10), BackgroundColor3 = Color3.fromRGB(150, 130, 200)}):Play()
-            TweenService:Create(ContStroke, tweenInfo, {Color = Color3.fromRGB(60, 40, 120)}):Play()
-        end
-        if callback then callback(isOn) end
-    end
-
-    -- Klick auf gesamten Container
-    local ClickBtn = Instance.new("TextButton")
-    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
-    ClickBtn.BackgroundTransparency = 1
-    ClickBtn.Text = ""
-    ClickBtn.Parent = Container
-
-    ClickBtn.MouseButton1Click:Connect(function()
-        SetToggle(not isOn)
-    end)
-
-    return Container, SetToggle
-end
-
--- ================================================
--- CONTENT BEREICH
--- ================================================
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, 0, 1, -50)
-ContentFrame.Position = UDim2.new(0, 0, 0, 50)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
-
--- ================================================
--- STEAL TOGGLE
--- ================================================
-local StealContainer, SetSteal = CreateToggleButton(ContentFrame, 15, "💰", "Auto Steal (Brainrot → Base)", function(state)
-    Config.StealEnabled = state
-end)
-
--- Steal Logik: Teleportiert zum Spawn wenn aktiviert und Brainrot gefunden
-RunService.Heartbeat:Connect(function()
-    if not Config.StealEnabled then return end
-    if not Config.SpawnPosition then return end
-
-    -- Prüfe ob Spieler ein Brainrot-Objekt in der Nähe hat
-    -- (Anpassen: "Brainrot" ist der Name deines Objekts im Spiel)
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- Suche nach Brainrot-Objekten im Workspace
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name:lower():find("brainrot") and obj:IsA("BasePart") then
-            local dist = (hrp.Position - obj.Position).Magnitude
-            if dist < 8 then
-                -- Teleport zum Spawn
-                hrp.CFrame = Config.SpawnPosition
-                task.wait(1) -- Cooldown
-                break
-            end
-        end
-    end
-end)
-
--- ================================================
--- ESP TOGGLE + UNTERPANEL
--- ================================================
-local ESPContainer, SetESP = CreateToggleButton(ContentFrame, 80, "👁️", "ESP - Spieler anzeigen", function(state)
-    Config.ESPEnabled = state
-    if not state then
-        -- Alle ESP Highlights entfernen
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local char = player.Character
-                if char then
-                    local highlight = char:FindFirstChild("ESP_Highlight")
-                    if highlight then highlight:Destroy() end
-                    local billboard = char:FindFirstChild("ESP_Billboard")
-                    if billboard then billboard:Destroy() end
-                end
-            end
-        end
-    end
-end)
-
--- ESP Unterpanel
-local ESPPanel = Instance.new("Frame")
-ESPPanel.Size = UDim2.new(1, -20, 0, 70)
-ESPPanel.Position = UDim2.new(0, 10, 0, 145)
-ESPPanel.BackgroundColor3 = Color3.fromRGB(20, 15, 40)
-ESPPanel.BorderSizePixel = 0
-ESPPanel.Parent = ContentFrame
-
-local ESPPanelCorner = Instance.new("UICorner")
-ESPPanelCorner.CornerRadius = UDim.new(0, 10)
-ESPPanelCorner.Parent = ESPPanel
-
-local ESPPanelStroke = Instance.new("UIStroke")
-ESPPanelStroke.Color = Color3.fromRGB(60, 40, 120)
-ESPPanelStroke.Thickness = 1
-ESPPanelStroke.Parent = ESPPanel
-
--- "Players" Label + On/Off
-local PlayersLabel = Instance.new("TextLabel")
-PlayersLabel.Size = UDim2.new(0.5, 0, 0, 30)
-PlayersLabel.Position = UDim2.new(0, 10, 0, 5)
-PlayersLabel.BackgroundTransparency = 1
-PlayersLabel.Text = "👥 Players"
-PlayersLabel.TextColor3 = Color3.fromRGB(200, 190, 255)
-PlayersLabel.TextSize = 14
-PlayersLabel.Font = Enum.Font.GothamBold
-PlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
-PlayersLabel.Parent = ESPPanel
-
-local PlayersStatus = Instance.new("TextLabel")
-PlayersStatus.Size = UDim2.new(0.4, 0, 0, 30)
-PlayersStatus.Position = UDim2.new(0.6, -10, 0, 5)
-PlayersStatus.BackgroundTransparency = 1
-PlayersStatus.Text = "OFF"
-PlayersStatus.TextColor3 = Color3.fromRGB(220, 80, 80)
-PlayersStatus.TextSize = 14
-PlayersStatus.Font = Enum.Font.GothamBold
-PlayersStatus.TextXAlignment = Enum.TextXAlignment.Right
-PlayersStatus.Parent = ESPPanel
-
--- Farb-Auswahl Buttons
-local ColorLabel = Instance.new("TextLabel")
-ColorLabel.Size = UDim2.new(0.4, 0, 0, 25)
-ColorLabel.Position = UDim2.new(0, 10, 0, 38)
-ColorLabel.BackgroundTransparency = 1
-ColorLabel.Text = "🎨 Farbe:"
-ColorLabel.TextColor3 = Color3.fromRGB(180, 170, 220)
-ColorLabel.TextSize = 13
-ColorLabel.Font = Enum.Font.Gotham
-ColorLabel.TextXAlignment = Enum.TextXAlignment.Left
-ColorLabel.Parent = ESPPanel
-
-local colors = {
-    {Color3.fromRGB(255, 50, 50), "🔴"},
-    {Color3.fromRGB(50, 255, 100), "🟢"},
-    {Color3.fromRGB(50, 150, 255), "🔵"},
-    {Color3.fromRGB(255, 220, 50), "🟡"},
-}
-
-for i, colorData in ipairs(colors) do
-    local ColorBtn = Instance.new("TextButton")
-    ColorBtn.Size = UDim2.new(0, 28, 0, 22)
-    ColorBtn.Position = UDim2.new(0, 80 + (i-1)*32, 0, 40)
-    ColorBtn.BackgroundColor3 = colorData[1]
-    ColorBtn.Text = ""
-    ColorBtn.BorderSizePixel = 0
-    ColorBtn.Parent = ESPPanel
-
-    local CBCorner = Instance.new("UICorner")
-    CBCorner.CornerRadius = UDim.new(0, 5)
-    CBCorner.Parent = ColorBtn
-
-    ColorBtn.MouseButton1Click:Connect(function()
-        Config.ESPColor = colorData[1]
-        -- Alle bestehenden Highlights updaten
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local h = player.Character:FindFirstChild("ESP_Highlight")
-                if h then
-                    h.OutlineColor = colorData[1]
-                    h.FillColor = colorData[1]
-                end
-            end
-        end
-        -- Pulse Animation auf Button
-        TweenService:Create(ColorBtn, TweenInfo.new(0.1), {Size = UDim2.new(0, 24, 0, 18)}):Play()
-        task.wait(0.1)
-        TweenService:Create(ColorBtn, TweenInfo.new(0.1), {Size = UDim2.new(0, 28, 0, 22)}):Play()
-    end)
-end
-
--- ESP Logik
-local function AddESP(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        if Config.ESPEnabled then
-            local highlight = Instance.new("SelectionBox")
-            highlight.Name = "ESP_Highlight"
-            highlight.Adornee = char
-            highlight.Color3 = Config.ESPColor
-            highlight.LineThickness = 0.05
-            highlight.SurfaceTransparency = 0.7
-            highlight.SurfaceColor3 = Config.ESPColor
-            highlight.Parent = char
-        end
-    end)
-end
-
--- ESP Update Loop
-RunService.Heartbeat:Connect(function()
-    if not Config.ESPEnabled then
-        PlayersStatus.Text = "OFF"
-        PlayersStatus.TextColor3 = Color3.fromRGB(220, 80, 80)
-        return
-    end
-
-    PlayersStatus.Text = "ON"
-    PlayersStatus.TextColor3 = Color3.fromRGB(80, 220, 120)
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local char = player.Character
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                -- Highlight hinzufügen wenn nicht vorhanden
-                if not char:FindFirstChild("ESP_Highlight") then
-                    local highlight = Instance.new("SelectionBox")
-                    highlight.Name = "ESP_Highlight"
-                    highlight.Adornee = char
-                    highlight.Color3 = Config.ESPColor
-                    highlight.LineThickness = 0.05
-                    highlight.SurfaceTransparency = 0.6
-                    highlight.SurfaceColor3 = Config.ESPColor
-                    highlight.Parent = char
-                end
-
-                -- Name Billboard
-                if not char:FindFirstChild("ESP_Billboard") then
-                    local billboard = Instance.new("BillboardGui")
-                    billboard.Name = "ESP_Billboard"
-                    billboard.Size = UDim2.new(0, 120, 0, 30)
-                    billboard.StudsOffset = Vector3.new(0, 3, 0)
-                    billboard.AlwaysOnTop = true
-                    billboard.Adornee = hrp
-                    billboard.Parent = char
-
-                    local nameLabel = Instance.new("TextLabel")
-                    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-                    nameLabel.BackgroundTransparency = 1
-                    nameLabel.Text = player.Name
-                    nameLabel.TextColor3 = Config.ESPColor
-                    nameLabel.TextSize = 14
-                    nameLabel.Font = Enum.Font.GothamBold
-                    nameLabel.TextStrokeTransparency = 0
-                    nameLabel.Parent = billboard
-                end
-
-                -- Farbe updaten
-                local h = char:FindFirstChild("ESP_Highlight")
-                if h then
-                    h.Color3 = Config.ESPColor
-                    h.SurfaceColor3 = Config.ESPColor
-                end
-            end
-        end
-    end
-end)
-
-Players.PlayerAdded:Connect(AddESP)
-for _, p in ipairs(Players:GetPlayers()) do AddESP(p) end
-
--- ================================================
--- UNSICHTBAR TOGGLE
--- ================================================
-local InvisContainer, SetInvis = CreateToggleButton(ContentFrame, 225, "👻", "Unsichtbar (Transparent)", function(state)
-    Config.InvisibleEnabled = state
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") or part:IsA("Decal") then
-            if state then
-                part.Transparency = 1
-            else
-                -- Standard-Transparenz wiederherstellen
-                if part:IsA("BasePart") then
-                    part.Transparency = 0
-                elseif part:IsA("Decal") then
-                    part.Transparency = 0
-                end
-            end
-        end
-    end
-end)
-
--- Unsichtbar auch nach Respawn anwenden
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    if Config.InvisibleEnabled then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("Decal") then
-                part.Transparency = 1
-            end
-        end
-    end
-end)
-
--- ================================================
--- TELEPORT ZU SPAWN
--- ================================================
-local TeleportBtn = Instance.new("TextButton")
-TeleportBtn.Size = UDim2.new(1, -20, 0, 45)
-TeleportBtn.Position = UDim2.new(0, 10, 0, 290)
-TeleportBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
-TeleportBtn.Text = "🏠  Teleport zu Base (Spawn)"
-TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeleportBtn.TextSize = 14
-TeleportBtn.Font = Enum.Font.GothamBold
-TeleportBtn.BorderSizePixel = 0
-TeleportBtn.Parent = ContentFrame
-
-local TpCorner = Instance.new("UICorner")
-TpCorner.CornerRadius = UDim.new(0, 10)
-TpCorner.Parent = TeleportBtn
-
-local TpGradient = Instance.new("UIGradient")
-TpGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 200, 120)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 140, 80)),
-})
-TpGradient.Rotation = 90
-TpGradient.Parent = TeleportBtn
-
-TeleportBtn.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") and Config.SpawnPosition then
-        char.HumanoidRootPart.CFrame = Config.SpawnPosition
-        -- Button Animation
-        TweenService:Create(TeleportBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(40, 255, 100)}):Play()
-        task.wait(0.2)
-        TweenService:Create(TeleportBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 180, 100)}):Play()
-    end
-end)
-
--- ================================================
--- STATUS LABEL
--- ================================================
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 25)
-StatusLabel.Position = UDim2.new(0, 10, 0, 345)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "✅ Script aktiv | Spawn gespeichert"
-StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 140)
-StatusLabel.TextSize = 12
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
-StatusLabel.Parent = ContentFrame
-
--- ================================================
--- ÖFFNEN/SCHLIESSEN BUTTON (immer sichtbar)
--- ================================================
-local ToggleOpenBtn = Instance.new("TextButton")
-ToggleOpenBtn.Size = UDim2.new(0, 120, 0, 35)
-ToggleOpenBtn.Position = UDim2.new(0, 10, 1, -50)
-ToggleOpenBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
-ToggleOpenBtn.Text = "🧠 Brainrot GUI"
-ToggleOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleOpenBtn.TextSize = 12
-ToggleOpenBtn.Font = Enum.Font.GothamBold
-ToggleOpenBtn.BorderSizePixel = 0
-ToggleOpenBtn.Parent = ScreenGui
-
-local ToggleBtnCorner = Instance.new("UICorner")
-ToggleBtnCorner.CornerRadius = UDim.new(0, 8)
-ToggleBtnCorner.Parent = ToggleOpenBtn
-
--- ================================================
--- CLOSE/OPEN ANIMATIONEN
--- ================================================
-local function CloseGUI()
-    Config.GUIOpen = false
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-    })
-    tween:Play()
-    tween.Completed:Connect(function()
-        MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 320, 0, 420)
-        MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
-    end)
-end
-
-local function OpenGUI()
-    Config.GUIOpen = true
-    MainFrame.Visible = true
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 320, 0, 420),
-        Position = UDim2.new(0.5, -160, 0.5, -210),
-    }):Play()
-end
-
-CloseBtn.MouseButton1Click:Connect(CloseGUI)
-ToggleOpenBtn.MouseButton1Click:Connect(function()
-    if Config.GUIOpen then
-        CloseGUI()
-    else
-        OpenGUI()
-    end
-end)
-
--- ================================================
+-- ════════════════════════════════════════════════════
 -- EINGANGS ANIMATION
--- ================================================
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-task.wait(0.5)
+-- ════════════════════════════════════════════════════
+Main.Size     = UDim2.new(0, 0, 0, 0)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+task.wait(0.6)
 OpenGUI()
 
--- Spawn Position Status updaten
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if Config.SpawnPosition then
-            local p = Config.SpawnPosition.Position
-            StatusLabel.Text = string.format("✅ Spawn: %.0f, %.0f, %.0f", p.X, p.Y, p.Z)
-        end
-    end
-end)
-
-print("[BrainrotGUI] Script geladen! GUI bereit.")
+print("╔══════════════════════════════════════╗")
+print("║  🧠 BrainrotAdmin V4 geladen!        ║")
+print("║  Tabs: BEST / STEAL / ESP / INVIS    ║")
+print("║  Spawn gespeichert beim Start        ║")
+print("╚══════════════════════════════════════╝")
