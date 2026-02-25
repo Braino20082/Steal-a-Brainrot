@@ -1,79 +1,666 @@
---// SERVICES
+-- ================================================
+--   STEAL A BRAINROT - Admin GUI Script
+--   Für: Lokaler Spielentwickler
+--   Features: ESP, Steal, Invisible, Teleport, Toggle
+-- ================================================
+
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local player = Players.LocalPlayer
+-- ================================================
+-- KONFIGURATION
+-- ================================================
+local Config = {
+    ESPColor = Color3.fromRGB(255, 50, 50),
+    ESPEnabled = false,
+    InvisibleEnabled = false,
+    StealEnabled = false,
+    GUIOpen = true,
+    SpawnPosition = nil, -- wird beim Start gespeichert
+}
 
---// GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "AdminPanel"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+-- ================================================
+-- SPAWN POSITION SPEICHERN
+-- ================================================
+local function SaveSpawnPosition()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        Config.SpawnPosition = char.HumanoidRootPart.CFrame
+    end
+end
 
--- BACKGROUND BLUR EFFECT
-local blur = Instance.new("BlurEffect")
-blur.Size = 0
-blur.Parent = game:GetService("Lighting")
-
--- MAIN FRAME
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 0, 0, 0)
-frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-frame.AnchorPoint = Vector2.new(0.5,0.5)
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-frame.Parent = gui
-frame.BorderSizePixel = 0
-
--- CORNER ROUNDING
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0,15)
-
--- TITLE
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,50)
-title.BackgroundColor3 = Color3.fromRGB(35,35,35)
-title.Text = "ADMIN PANEL"
-title.TextColor3 = Color3.new(1,1,1)
-title.TextScaled = true
-title.Parent = frame
-
-local titleCorner = Instance.new("UICorner", title)
-titleCorner.CornerRadius = UDim.new(0,15)
-
--- CLOSE BUTTON
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0,40,0,40)
-close.Position = UDim2.new(1,-45,0,5)
-close.Text = "X"
-close.BackgroundColor3 = Color3.fromRGB(170,0,0)
-close.TextColor3 = Color3.new(1,1,1)
-close.Parent = frame
-
-local closeCorner = Instance.new("UICorner", close)
-closeCorner.CornerRadius = UDim.new(0,10)
-
--- OPEN ANIMATION
-frame:TweenSize(
-	UDim2.new(0,350,0,300),
-	Enum.EasingDirection.Out,
-	Enum.EasingStyle.Back,
-	0.5,
-	true
-)
-
-TweenService:Create(blur, TweenInfo.new(0.5), {Size = 15}):Play()
-
--- CLOSE ANIMATION
-close.MouseButton1Click:Connect(function()
-	frame:TweenSize(
-		UDim2.new(0,0,0,0),
-		Enum.EasingDirection.In,
-		Enum.EasingStyle.Back,
-		0.4,
-		true
-	)
-	TweenService:Create(blur, TweenInfo.new(0.4), {Size = 0}):Play()
-	task.wait(0.4)
-	gui:Destroy()
-	blur:Destroy()
+-- Warte auf Character und speichere Position
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    SaveSpawnPosition()
 end)
+
+if LocalPlayer.Character then
+    task.wait(1)
+    SaveSpawnPosition()
+end
+
+-- ================================================
+-- GUI ERSTELLEN
+-- ================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BrainrotAdminGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+-- Haupt-Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+-- Abgerundete Ecken
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+-- Glow-Effekt (Stroke)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(120, 60, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+-- Gradient Hintergrund
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 10, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 15, 35)),
+})
+UIGradient.Rotation = 135
+UIGradient.Parent = MainFrame
+
+-- ================================================
+-- TITELLEISTE
+-- ================================================
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.Position = UDim2.new(0, 0, 0, 0)
+TitleBar.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleGradient = Instance.new("UIGradient")
+TitleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 50, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 20, 180)),
+})
+TitleGradient.Rotation = 90
+TitleGradient.Parent = TitleBar
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = TitleBar
+
+-- Titel-Fix (untere Ecken gerade)
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0.5, 0)
+TitleFix.Position = UDim2.new(0, 0, 0.5, 0)
+TitleFix.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleFixGradient = Instance.new("UIGradient")
+TitleFixGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 50, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 20, 180)),
+})
+TitleFixGradient.Rotation = 90
+TitleFixGradient.Parent = TitleFix
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -60, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "🧠 Brainrot Admin"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 18
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -42, 0.5, -17)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 80)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = TitleBar
+
+local CloseBtnCorner = Instance.new("UICorner")
+CloseBtnCorner.CornerRadius = UDim.new(0, 8)
+CloseBtnCorner.Parent = CloseBtn
+
+-- ================================================
+-- DRAGGABLE GUI
+-- ================================================
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+TitleBar.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- ================================================
+-- HELPER: TOGGLE BUTTON ERSTELLEN
+-- ================================================
+local function CreateToggleButton(parent, yPos, icon, label, callback)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, -20, 0, 55)
+    Container.Position = UDim2.new(0, 10, 0, yPos)
+    Container.BackgroundColor3 = Color3.fromRGB(25, 20, 45)
+    Container.BorderSizePixel = 0
+    Container.Parent = parent
+
+    local ContCorner = Instance.new("UICorner")
+    ContCorner.CornerRadius = UDim.new(0, 10)
+    ContCorner.Parent = Container
+
+    local ContStroke = Instance.new("UIStroke")
+    ContStroke.Color = Color3.fromRGB(60, 40, 120)
+    ContStroke.Thickness = 1
+    ContStroke.Parent = Container
+
+    local IconLabel = Instance.new("TextLabel")
+    IconLabel.Size = UDim2.new(0, 40, 1, 0)
+    IconLabel.Position = UDim2.new(0, 5, 0, 0)
+    IconLabel.BackgroundTransparency = 1
+    IconLabel.Text = icon
+    IconLabel.TextSize = 22
+    IconLabel.Font = Enum.Font.GothamBold
+    IconLabel.Parent = Container
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(1, -110, 1, 0)
+    NameLabel.Position = UDim2.new(0, 50, 0, 0)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = label
+    NameLabel.TextColor3 = Color3.fromRGB(220, 210, 255)
+    NameLabel.TextSize = 15
+    NameLabel.Font = Enum.Font.Gotham
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.Parent = Container
+
+    -- Toggle Switch
+    local ToggleBg = Instance.new("Frame")
+    ToggleBg.Size = UDim2.new(0, 50, 0, 26)
+    ToggleBg.Position = UDim2.new(1, -60, 0.5, -13)
+    ToggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    ToggleBg.BorderSizePixel = 0
+    ToggleBg.Parent = Container
+
+    local ToggleBgCorner = Instance.new("UICorner")
+    ToggleBgCorner.CornerRadius = UDim.new(1, 0)
+    ToggleBgCorner.Parent = ToggleBg
+
+    local ToggleKnob = Instance.new("Frame")
+    ToggleKnob.Size = UDim2.new(0, 20, 0, 20)
+    ToggleKnob.Position = UDim2.new(0, 3, 0.5, -10)
+    ToggleKnob.BackgroundColor3 = Color3.fromRGB(150, 130, 200)
+    ToggleKnob.BorderSizePixel = 0
+    ToggleKnob.Parent = ToggleBg
+
+    local KnobCorner = Instance.new("UICorner")
+    KnobCorner.CornerRadius = UDim.new(1, 0)
+    KnobCorner.Parent = ToggleKnob
+
+    local isOn = false
+
+    local function SetToggle(state)
+        isOn = state
+        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        if isOn then
+            TweenService:Create(ToggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(120, 60, 255)}):Play()
+            TweenService:Create(ToggleKnob, tweenInfo, {Position = UDim2.new(0, 27, 0.5, -10), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(ContStroke, tweenInfo, {Color = Color3.fromRGB(120, 60, 255)}):Play()
+        else
+            TweenService:Create(ToggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
+            TweenService:Create(ToggleKnob, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -10), BackgroundColor3 = Color3.fromRGB(150, 130, 200)}):Play()
+            TweenService:Create(ContStroke, tweenInfo, {Color = Color3.fromRGB(60, 40, 120)}):Play()
+        end
+        if callback then callback(isOn) end
+    end
+
+    -- Klick auf gesamten Container
+    local ClickBtn = Instance.new("TextButton")
+    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+    ClickBtn.BackgroundTransparency = 1
+    ClickBtn.Text = ""
+    ClickBtn.Parent = Container
+
+    ClickBtn.MouseButton1Click:Connect(function()
+        SetToggle(not isOn)
+    end)
+
+    return Container, SetToggle
+end
+
+-- ================================================
+-- CONTENT BEREICH
+-- ================================================
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -50)
+ContentFrame.Position = UDim2.new(0, 0, 0, 50)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- ================================================
+-- STEAL TOGGLE
+-- ================================================
+local StealContainer, SetSteal = CreateToggleButton(ContentFrame, 15, "💰", "Auto Steal (Brainrot → Base)", function(state)
+    Config.StealEnabled = state
+end)
+
+-- Steal Logik: Teleportiert zum Spawn wenn aktiviert und Brainrot gefunden
+RunService.Heartbeat:Connect(function()
+    if not Config.StealEnabled then return end
+    if not Config.SpawnPosition then return end
+
+    -- Prüfe ob Spieler ein Brainrot-Objekt in der Nähe hat
+    -- (Anpassen: "Brainrot" ist der Name deines Objekts im Spiel)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- Suche nach Brainrot-Objekten im Workspace
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find("brainrot") and obj:IsA("BasePart") then
+            local dist = (hrp.Position - obj.Position).Magnitude
+            if dist < 8 then
+                -- Teleport zum Spawn
+                hrp.CFrame = Config.SpawnPosition
+                task.wait(1) -- Cooldown
+                break
+            end
+        end
+    end
+end)
+
+-- ================================================
+-- ESP TOGGLE + UNTERPANEL
+-- ================================================
+local ESPContainer, SetESP = CreateToggleButton(ContentFrame, 80, "👁️", "ESP - Spieler anzeigen", function(state)
+    Config.ESPEnabled = state
+    if not state then
+        -- Alle ESP Highlights entfernen
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local char = player.Character
+                if char then
+                    local highlight = char:FindFirstChild("ESP_Highlight")
+                    if highlight then highlight:Destroy() end
+                    local billboard = char:FindFirstChild("ESP_Billboard")
+                    if billboard then billboard:Destroy() end
+                end
+            end
+        end
+    end
+end)
+
+-- ESP Unterpanel
+local ESPPanel = Instance.new("Frame")
+ESPPanel.Size = UDim2.new(1, -20, 0, 70)
+ESPPanel.Position = UDim2.new(0, 10, 0, 145)
+ESPPanel.BackgroundColor3 = Color3.fromRGB(20, 15, 40)
+ESPPanel.BorderSizePixel = 0
+ESPPanel.Parent = ContentFrame
+
+local ESPPanelCorner = Instance.new("UICorner")
+ESPPanelCorner.CornerRadius = UDim.new(0, 10)
+ESPPanelCorner.Parent = ESPPanel
+
+local ESPPanelStroke = Instance.new("UIStroke")
+ESPPanelStroke.Color = Color3.fromRGB(60, 40, 120)
+ESPPanelStroke.Thickness = 1
+ESPPanelStroke.Parent = ESPPanel
+
+-- "Players" Label + On/Off
+local PlayersLabel = Instance.new("TextLabel")
+PlayersLabel.Size = UDim2.new(0.5, 0, 0, 30)
+PlayersLabel.Position = UDim2.new(0, 10, 0, 5)
+PlayersLabel.BackgroundTransparency = 1
+PlayersLabel.Text = "👥 Players"
+PlayersLabel.TextColor3 = Color3.fromRGB(200, 190, 255)
+PlayersLabel.TextSize = 14
+PlayersLabel.Font = Enum.Font.GothamBold
+PlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
+PlayersLabel.Parent = ESPPanel
+
+local PlayersStatus = Instance.new("TextLabel")
+PlayersStatus.Size = UDim2.new(0.4, 0, 0, 30)
+PlayersStatus.Position = UDim2.new(0.6, -10, 0, 5)
+PlayersStatus.BackgroundTransparency = 1
+PlayersStatus.Text = "OFF"
+PlayersStatus.TextColor3 = Color3.fromRGB(220, 80, 80)
+PlayersStatus.TextSize = 14
+PlayersStatus.Font = Enum.Font.GothamBold
+PlayersStatus.TextXAlignment = Enum.TextXAlignment.Right
+PlayersStatus.Parent = ESPPanel
+
+-- Farb-Auswahl Buttons
+local ColorLabel = Instance.new("TextLabel")
+ColorLabel.Size = UDim2.new(0.4, 0, 0, 25)
+ColorLabel.Position = UDim2.new(0, 10, 0, 38)
+ColorLabel.BackgroundTransparency = 1
+ColorLabel.Text = "🎨 Farbe:"
+ColorLabel.TextColor3 = Color3.fromRGB(180, 170, 220)
+ColorLabel.TextSize = 13
+ColorLabel.Font = Enum.Font.Gotham
+ColorLabel.TextXAlignment = Enum.TextXAlignment.Left
+ColorLabel.Parent = ESPPanel
+
+local colors = {
+    {Color3.fromRGB(255, 50, 50), "🔴"},
+    {Color3.fromRGB(50, 255, 100), "🟢"},
+    {Color3.fromRGB(50, 150, 255), "🔵"},
+    {Color3.fromRGB(255, 220, 50), "🟡"},
+}
+
+for i, colorData in ipairs(colors) do
+    local ColorBtn = Instance.new("TextButton")
+    ColorBtn.Size = UDim2.new(0, 28, 0, 22)
+    ColorBtn.Position = UDim2.new(0, 80 + (i-1)*32, 0, 40)
+    ColorBtn.BackgroundColor3 = colorData[1]
+    ColorBtn.Text = ""
+    ColorBtn.BorderSizePixel = 0
+    ColorBtn.Parent = ESPPanel
+
+    local CBCorner = Instance.new("UICorner")
+    CBCorner.CornerRadius = UDim.new(0, 5)
+    CBCorner.Parent = ColorBtn
+
+    ColorBtn.MouseButton1Click:Connect(function()
+        Config.ESPColor = colorData[1]
+        -- Alle bestehenden Highlights updaten
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local h = player.Character:FindFirstChild("ESP_Highlight")
+                if h then
+                    h.OutlineColor = colorData[1]
+                    h.FillColor = colorData[1]
+                end
+            end
+        end
+        -- Pulse Animation auf Button
+        TweenService:Create(ColorBtn, TweenInfo.new(0.1), {Size = UDim2.new(0, 24, 0, 18)}):Play()
+        task.wait(0.1)
+        TweenService:Create(ColorBtn, TweenInfo.new(0.1), {Size = UDim2.new(0, 28, 0, 22)}):Play()
+    end)
+end
+
+-- ESP Logik
+local function AddESP(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        if Config.ESPEnabled then
+            local highlight = Instance.new("SelectionBox")
+            highlight.Name = "ESP_Highlight"
+            highlight.Adornee = char
+            highlight.Color3 = Config.ESPColor
+            highlight.LineThickness = 0.05
+            highlight.SurfaceTransparency = 0.7
+            highlight.SurfaceColor3 = Config.ESPColor
+            highlight.Parent = char
+        end
+    end)
+end
+
+-- ESP Update Loop
+RunService.Heartbeat:Connect(function()
+    if not Config.ESPEnabled then
+        PlayersStatus.Text = "OFF"
+        PlayersStatus.TextColor3 = Color3.fromRGB(220, 80, 80)
+        return
+    end
+
+    PlayersStatus.Text = "ON"
+    PlayersStatus.TextColor3 = Color3.fromRGB(80, 220, 120)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                -- Highlight hinzufügen wenn nicht vorhanden
+                if not char:FindFirstChild("ESP_Highlight") then
+                    local highlight = Instance.new("SelectionBox")
+                    highlight.Name = "ESP_Highlight"
+                    highlight.Adornee = char
+                    highlight.Color3 = Config.ESPColor
+                    highlight.LineThickness = 0.05
+                    highlight.SurfaceTransparency = 0.6
+                    highlight.SurfaceColor3 = Config.ESPColor
+                    highlight.Parent = char
+                end
+
+                -- Name Billboard
+                if not char:FindFirstChild("ESP_Billboard") then
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Name = "ESP_Billboard"
+                    billboard.Size = UDim2.new(0, 120, 0, 30)
+                    billboard.StudsOffset = Vector3.new(0, 3, 0)
+                    billboard.AlwaysOnTop = true
+                    billboard.Adornee = hrp
+                    billboard.Parent = char
+
+                    local nameLabel = Instance.new("TextLabel")
+                    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+                    nameLabel.BackgroundTransparency = 1
+                    nameLabel.Text = player.Name
+                    nameLabel.TextColor3 = Config.ESPColor
+                    nameLabel.TextSize = 14
+                    nameLabel.Font = Enum.Font.GothamBold
+                    nameLabel.TextStrokeTransparency = 0
+                    nameLabel.Parent = billboard
+                end
+
+                -- Farbe updaten
+                local h = char:FindFirstChild("ESP_Highlight")
+                if h then
+                    h.Color3 = Config.ESPColor
+                    h.SurfaceColor3 = Config.ESPColor
+                end
+            end
+        end
+    end
+end)
+
+Players.PlayerAdded:Connect(AddESP)
+for _, p in ipairs(Players:GetPlayers()) do AddESP(p) end
+
+-- ================================================
+-- UNSICHTBAR TOGGLE
+-- ================================================
+local InvisContainer, SetInvis = CreateToggleButton(ContentFrame, 225, "👻", "Unsichtbar (Transparent)", function(state)
+    Config.InvisibleEnabled = state
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("Decal") then
+            if state then
+                part.Transparency = 1
+            else
+                -- Standard-Transparenz wiederherstellen
+                if part:IsA("BasePart") then
+                    part.Transparency = 0
+                elseif part:IsA("Decal") then
+                    part.Transparency = 0
+                end
+            end
+        end
+    end
+end)
+
+-- Unsichtbar auch nach Respawn anwenden
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    if Config.InvisibleEnabled then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+            end
+        end
+    end
+end)
+
+-- ================================================
+-- TELEPORT ZU SPAWN
+-- ================================================
+local TeleportBtn = Instance.new("TextButton")
+TeleportBtn.Size = UDim2.new(1, -20, 0, 45)
+TeleportBtn.Position = UDim2.new(0, 10, 0, 290)
+TeleportBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
+TeleportBtn.Text = "🏠  Teleport zu Base (Spawn)"
+TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBtn.TextSize = 14
+TeleportBtn.Font = Enum.Font.GothamBold
+TeleportBtn.BorderSizePixel = 0
+TeleportBtn.Parent = ContentFrame
+
+local TpCorner = Instance.new("UICorner")
+TpCorner.CornerRadius = UDim.new(0, 10)
+TpCorner.Parent = TeleportBtn
+
+local TpGradient = Instance.new("UIGradient")
+TpGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 200, 120)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 140, 80)),
+})
+TpGradient.Rotation = 90
+TpGradient.Parent = TeleportBtn
+
+TeleportBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and Config.SpawnPosition then
+        char.HumanoidRootPart.CFrame = Config.SpawnPosition
+        -- Button Animation
+        TweenService:Create(TeleportBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(40, 255, 100)}):Play()
+        task.wait(0.2)
+        TweenService:Create(TeleportBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 180, 100)}):Play()
+    end
+end)
+
+-- ================================================
+-- STATUS LABEL
+-- ================================================
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 25)
+StatusLabel.Position = UDim2.new(0, 10, 0, 345)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "✅ Script aktiv | Spawn gespeichert"
+StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 140)
+StatusLabel.TextSize = 12
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
+StatusLabel.Parent = ContentFrame
+
+-- ================================================
+-- ÖFFNEN/SCHLIESSEN BUTTON (immer sichtbar)
+-- ================================================
+local ToggleOpenBtn = Instance.new("TextButton")
+ToggleOpenBtn.Size = UDim2.new(0, 120, 0, 35)
+ToggleOpenBtn.Position = UDim2.new(0, 10, 1, -50)
+ToggleOpenBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 220)
+ToggleOpenBtn.Text = "🧠 Brainrot GUI"
+ToggleOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleOpenBtn.TextSize = 12
+ToggleOpenBtn.Font = Enum.Font.GothamBold
+ToggleOpenBtn.BorderSizePixel = 0
+ToggleOpenBtn.Parent = ScreenGui
+
+local ToggleBtnCorner = Instance.new("UICorner")
+ToggleBtnCorner.CornerRadius = UDim.new(0, 8)
+ToggleBtnCorner.Parent = ToggleOpenBtn
+
+-- ================================================
+-- CLOSE/OPEN ANIMATIONEN
+-- ================================================
+local function CloseGUI()
+    Config.GUIOpen = false
+    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+    })
+    tween:Play()
+    tween.Completed:Connect(function()
+        MainFrame.Visible = false
+        MainFrame.Size = UDim2.new(0, 320, 0, 420)
+        MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+    end)
+end
+
+local function OpenGUI()
+    Config.GUIOpen = true
+    MainFrame.Visible = true
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 320, 0, 420),
+        Position = UDim2.new(0.5, -160, 0.5, -210),
+    }):Play()
+end
+
+CloseBtn.MouseButton1Click:Connect(CloseGUI)
+ToggleOpenBtn.MouseButton1Click:Connect(function()
+    if Config.GUIOpen then
+        CloseGUI()
+    else
+        OpenGUI()
+    end
+end)
+
+-- ================================================
+-- EINGANGS ANIMATION
+-- ================================================
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+task.wait(0.5)
+OpenGUI()
+
+-- Spawn Position Status updaten
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if Config.SpawnPosition then
+            local p = Config.SpawnPosition.Position
+            StatusLabel.Text = string.format("✅ Spawn: %.0f, %.0f, %.0f", p.X, p.Y, p.Z)
+        end
+    end
+end)
+
+print("[BrainrotGUI] Script geladen! GUI bereit.")
