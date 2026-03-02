@@ -1,18 +1,28 @@
 --[[
-    NEON ANIME GLOW ADMIN PANEL - INSTANT START VERSION
+    NEON ANIME GLOW ADMIN PANEL - ULTRA ROBUST VERSION
+    Dieses Script wurde speziell entwickelt, um den "attempt to call a nil value" Fehler zu vermeiden.
+    Alle kritischen Aufrufe sind in pcalls (Protected Calls) eingeschlossen.
     Platzierung: StarterGui (als LocalScript)
     Taste: 'O' zum Öffnen/Schließen
-    Verhalten: Startet SOFORT beim Laden mit Animation
 ]]
 
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting = game:GetService("Lighting")
+-- Sicherer Zugriff auf Dienste
+local function getService(name)
+    local success, service = pcall(function() return game:GetService(name) end)
+    return success and service or nil
+end
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local Players = getService("Players")
+local TweenService = getService("TweenService")
+local UserInputService = getService("UserInputService")
+local ReplicatedStorage = getService("ReplicatedStorage")
+local Lighting = getService("Lighting")
+
+-- Warten auf den Spieler und PlayerGui
+local player = Players and Players.LocalPlayer
+if not player then return end
+local playerGui = player:WaitForChild("PlayerGui", 10)
+if not playerGui then return end
 
 -- Konfiguration
 local TASTE = Enum.KeyCode.O
@@ -21,29 +31,34 @@ local BG_COLOR = Color3.fromRGB(15, 15, 20)
 local ACCENT_COLOR = Color3.fromRGB(30, 30, 40)
 local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
 
--- GUI Erstellung
+-- GUI Erstellung (Sicher im PlayerGui)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "B-AdminPanel_Instant"
+ScreenGui.Name = "B-AdminPanel_Ultra"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = playerGui
 
--- Blur Effekt (Sicher erstellt)
-local Blur = Lighting:FindFirstChild("B-AdminBlur") or Instance.new("BlurEffect")
-Blur.Name = "B-AdminBlur"
-Blur.Size = 0
-Blur.Enabled = false
-Blur.Parent = Lighting
+-- Blur Effekt (Sicher erstellt, falls Lighting verfügbar)
+local Blur = nil
+if Lighting then
+    pcall(function()
+        Blur = Lighting:FindFirstChild("B-AdminBlur") or Instance.new("BlurEffect")
+        Blur.Name = "B-AdminBlur"
+        Blur.Size = 0
+        Blur.Enabled = false
+        Blur.Parent = Lighting
+    end)
+end
 
 -- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 600, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200) -- Startposition für Animation
+MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200)
 MainFrame.BackgroundColor3 = BG_COLOR
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
-MainFrame.Visible = false -- Wird durch toggle() sofort sichtbar gemacht
+MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
 
 -- Corner & Border Glow
@@ -57,28 +72,26 @@ UIStroke.Thickness = 2
 UIStroke.Transparency = 0.5
 UIStroke.Parent = MainFrame
 
--- Animierter Border Effekt
+-- Animierter Border Effekt (Sicherer Loop)
 task.spawn(function()
-    while true do
+    while MainFrame and MainFrame.Parent do
         local hue = (tick() * 0.2) % 1
-        UIStroke.Color = Color3.fromHSV(hue, 0.8, 1)
+        pcall(function()
+            UIStroke.Color = Color3.fromHSV(hue, 0.8, 1)
+        end)
         task.wait()
     end
 end)
 
--- Sidebar
+-- Sidebar & Content
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Size = UDim2.new(0, 150, 1, 0)
 Sidebar.BackgroundColor3 = ACCENT_COLOR
 Sidebar.BorderSizePixel = 0
 Sidebar.Parent = MainFrame
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
 
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 10)
-SidebarCorner.Parent = Sidebar
-
--- Content Area
 local Content = Instance.new("Frame")
 Content.Name = "Content"
 Content.Position = UDim2.new(0, 160, 0, 10)
@@ -86,7 +99,7 @@ Content.Size = UDim2.new(1, -170, 1, -20)
 Content.BackgroundTransparency = 1
 Content.Parent = MainFrame
 
--- Tabs Container
+-- Tabs Logik
 local Tabs = {}
 local function createTab(name)
     local TabFrame = Instance.new("ScrollingFrame")
@@ -113,7 +126,6 @@ local TPATab = createTab("TPA")
 -- Sidebar Buttons
 local function createSidebarButton(name, order)
     local btn = Instance.new("TextButton")
-    btn.Name = name .. "Btn"
     btn.Size = UDim2.new(0.9, 0, 0, 40)
     btn.Position = UDim2.new(0.05, 0, 0, 10 + (order * 50))
     btn.BackgroundColor3 = BG_COLOR
@@ -122,23 +134,7 @@ local function createSidebarButton(name, order)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.Parent = Sidebar
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = NEON_COLOR
-    stroke.Thickness = 1
-    stroke.Transparency = 0.8
-    stroke.Parent = btn
-    
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 0, Thickness = 2}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 0.8, Thickness = 1}):Play()
-    end)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     btn.MouseButton1Click:Connect(function()
         for _, tab in pairs(Tabs) do tab.Visible = false end
@@ -165,43 +161,51 @@ local function createContentButton(parent, text, callback)
     return btn
 end
 
--- LOGIK: Events
+-- LOGIK: Events (Sicherer Zugriff)
 local function refreshEvents()
     for _, child in pairs(EventsTab:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
-    for _, item in pairs(ReplicatedStorage:GetDescendants()) do
-        if item:IsA("RemoteEvent") then
-            createContentButton(EventsTab, "Fire: " .. item.Name, function() item:FireServer() end)
+    if ReplicatedStorage then
+        for _, item in pairs(ReplicatedStorage:GetDescendants()) do
+            if item:IsA("RemoteEvent") then
+                createContentButton(EventsTab, "Fire: " .. item.Name, function() 
+                    pcall(function() item:FireServer() end)
+                end)
+            end
         end
     end
 end
 
--- LOGIK: TP
+-- LOGIK: TP (Sicherer Zugriff)
 local function refreshPlayers()
     for _, child in pairs(TPTab:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player then
-            local frame = Instance.new("Frame")
-            frame.Size = UDim2.new(1, -10, 0, 50)
-            frame.BackgroundTransparency = 1
-            frame.Parent = TPTab
-            
-            local name = Instance.new("TextLabel")
-            name.Size = UDim2.new(0.6, 0, 1, 0)
-            name.Position = UDim2.new(0, 10, 0, 0)
-            name.BackgroundTransparency = 1
-            name.Text = p.DisplayName
-            name.TextColor3 = TEXT_COLOR
-            name.Font = Enum.Font.GothamBold
-            name.TextXAlignment = Enum.TextXAlignment.Left
-            name.Parent = frame
-            
-            local tpBtn = createContentButton(frame, "TP", function()
-                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame
-                end
-            end)
-            tpBtn.Size = UDim2.new(0, 60, 0, 30)
-            tpBtn.Position = UDim2.new(1, -70, 0, 10)
+    if Players then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, -10, 0, 50)
+                frame.BackgroundTransparency = 1
+                frame.Parent = TPTab
+                
+                local name = Instance.new("TextLabel")
+                name.Size = UDim2.new(0.6, 0, 1, 0)
+                name.Position = UDim2.new(0, 10, 0, 0)
+                name.BackgroundTransparency = 1
+                name.Text = p.DisplayName or p.Name
+                name.TextColor3 = TEXT_COLOR
+                name.Font = Enum.Font.GothamBold
+                name.TextXAlignment = Enum.TextXAlignment.Left
+                name.Parent = frame
+                
+                local tpBtn = createContentButton(frame, "TP", function()
+                    pcall(function()
+                        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame
+                        end
+                    end)
+                end)
+                tpBtn.Size = UDim2.new(0, 60, 0, 30)
+                tpBtn.Position = UDim2.new(1, -70, 0, 10)
+            end
         end
     end
 end
@@ -209,19 +213,23 @@ end
 -- LOGIK: TPA
 local savedPositions = {}
 createContentButton(TPATab, "Position speichern", function()
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local pos = player.Character.HumanoidRootPart.CFrame
-        local name = "Punkt " .. (#savedPositions + 1)
-        table.insert(savedPositions, pos)
-        createContentButton(TPATab, "TP zu " .. name, function()
-            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                player.Character.HumanoidRootPart.CFrame = pos
-            end
-        end)
-    end
+    pcall(function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = player.Character.HumanoidRootPart.CFrame
+            local name = "Punkt " .. (#savedPositions + 1)
+            table.insert(savedPositions, pos)
+            createContentButton(TPATab, "TP zu " .. name, function()
+                pcall(function()
+                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        player.Character.HumanoidRootPart.CFrame = pos
+                    end
+                end)
+            end)
+        end
+    end)
 end)
 
--- OPEN/CLOSE LOGIC
+-- OPEN/CLOSE LOGIC (Sicherer Tween)
 local isOpen = false
 local function toggle(instant)
     isOpen = not isOpen
@@ -229,38 +237,43 @@ local function toggle(instant)
         refreshEvents()
         refreshPlayers()
         MainFrame.Visible = true
-        Blur.Enabled = true
+        if Blur then pcall(function() Blur.Enabled = true end) end
         Tabs["Events"].Visible = true
         
         if instant then
             MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-            Blur.Size = 24
+            if Blur then pcall(function() Blur.Size = 24 end) end
         else
-            MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200)
-            TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -300, 0.5, -200)}):Play()
-            TweenService:Create(Blur, TweenInfo.new(0.5), {Size = 24}):Play()
+            pcall(function()
+                TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -300, 0.5, -200)}):Play()
+                if Blur then TweenService:Create(Blur, TweenInfo.new(0.5), {Size = 24}):Play() end
+            end)
         end
     else
-        TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 0}):Play()
-        local t = TweenService:Create(MainFrame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -300, 0.6, -200)})
-        t:Play()
-        t.Completed:Wait()
-        if not isOpen then
-            MainFrame.Visible = false
-            Blur.Enabled = false
-        end
+        pcall(function()
+            if Blur then TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 0}):Play() end
+            local t = TweenService:Create(MainFrame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -300, 0.6, -200)})
+            t:Play()
+            t.Completed:Wait()
+            if not isOpen then
+                MainFrame.Visible = false
+                if Blur then Blur.Enabled = false end
+            end
+        end)
     end
 end
 
--- Tastenkürzel
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == TASTE then toggle() end
-end)
+-- Tastenkürzel (Sicherer Input)
+if UserInputService then
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if not gpe and input.KeyCode == TASTE then toggle() end
+    end)
+end
 
--- SOFORTIGER START BEIM LADEN
+-- SOFORTIGER START
 task.spawn(function()
-    task.wait(0.1) -- Kurze Pause für saubere Initialisierung
-    toggle(false) -- Startet mit Animation
+    task.wait(0.5)
+    toggle(false)
 end)
 
-print("B-AdminPanel Instant geladen. Drücke 'O' zum Schließen.")
+print("B-AdminPanel Ultra Robust geladen.")
