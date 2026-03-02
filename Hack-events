@@ -1,18 +1,33 @@
+-- ╔══════════════════════════════════════════╗
+-- ║     NEON ADMIN PANEL - EXECUTOR VERSION  ║
+-- ║     Einfach in Executor einfügen & run   ║
+-- ╚══════════════════════════════════════════╝
+
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- FIX: Sicher warten bis LocalPlayer & PlayerGui bereit sind
-local LocalPlayer = Players.LocalPlayer
-if not LocalPlayer then
-    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+-- EXECUTOR FIX: LocalPlayer sicher holen
+local LocalPlayer
+repeat
     LocalPlayer = Players.LocalPlayer
-end
+    if not LocalPlayer then task.wait(0.1) end
+until LocalPlayer
 
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 15)
-if not PlayerGui then warn("[AdminPanel] PlayerGui nicht gefunden!") return end
+-- EXECUTOR FIX: PlayerGui sicher holen
+local PlayerGui
+repeat
+    PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not PlayerGui then task.wait(0.1) end
+until PlayerGui
+
+-- Altes Panel entfernen falls nochmal gerunnt
+local old = PlayerGui:FindFirstChild("NeonAdminPanel")
+if old then old:Destroy() end
+local oldHint = PlayerGui:FindFirstChild("AdminHint")
+if oldHint then oldHint:Destroy() end
 
 -- ═══════════ COLORS ═══════════
 local NEON_CYAN   = Color3.fromRGB(0, 255, 255)
@@ -38,7 +53,13 @@ ScreenGui.Name            = "NeonAdminPanel"
 ScreenGui.ResetOnSpawn    = false
 ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset  = true
-ScreenGui.Parent          = PlayerGui
+
+-- EXECUTOR FIX: Manche Executoren brauchen dies
+pcall(function()
+    ScreenGui.DisplayOrder = 999
+end)
+
+ScreenGui.Parent = PlayerGui
 
 -- Dark overlay
 local Overlay = Instance.new("Frame")
@@ -59,9 +80,9 @@ Main.Visible          = false
 Main.ZIndex           = 2
 Main.Parent           = ScreenGui
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 14)
-mainCorner.Parent       = Main
+local c1 = Instance.new("UICorner")
+c1.CornerRadius = UDim.new(0, 14)
+c1.Parent = Main
 
 local BorderStroke = Instance.new("UIStroke")
 BorderStroke.Thickness       = 2.5
@@ -77,17 +98,17 @@ TitleBar.BorderSizePixel  = 0
 TitleBar.ZIndex           = 3
 TitleBar.Parent           = Main
 
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 14)
-titleCorner.Parent       = TitleBar
+local c2 = Instance.new("UICorner")
+c2.CornerRadius = UDim.new(0, 14)
+c2.Parent = TitleBar
 
-local titleFiller = Instance.new("Frame")
-titleFiller.Size             = UDim2.new(1, 0, 0, 14)
-titleFiller.Position         = UDim2.new(0, 0, 1, -14)
-titleFiller.BackgroundColor3 = BG_MID
-titleFiller.BorderSizePixel  = 0
-titleFiller.ZIndex           = 3
-titleFiller.Parent           = TitleBar
+local titleFill = Instance.new("Frame")
+titleFill.Size             = UDim2.new(1, 0, 0, 14)
+titleFill.Position         = UDim2.new(0, 0, 1, -14)
+titleFill.BackgroundColor3 = BG_MID
+titleFill.BorderSizePixel  = 0
+titleFill.ZIndex           = 3
+titleFill.Parent           = TitleBar
 
 local TitleLbl = Instance.new("TextLabel")
 TitleLbl.Size                  = UDim2.new(1, -60, 1, 0)
@@ -115,7 +136,6 @@ HintLbl.Parent                = TitleBar
 
 -- Sidebar
 local Sidebar = Instance.new("Frame")
-Sidebar.Name             = "Sidebar"
 Sidebar.Size             = UDim2.new(0, 120, 1, -44)
 Sidebar.Position         = UDim2.new(0, 0, 0, 44)
 Sidebar.BackgroundColor3 = SIDEBAR_BG
@@ -142,7 +162,6 @@ sidePad.Parent       = Sidebar
 
 -- Content Area
 local Content = Instance.new("Frame")
-Content.Name                   = "Content"
 Content.Size                   = UDim2.new(1, -120, 1, -44)
 Content.Position               = UDim2.new(0, 120, 0, 44)
 Content.BackgroundColor3       = BG_LIGHT
@@ -158,22 +177,22 @@ local function neonBtn(parent, text, size, pos, color, zi)
     zi    = zi    or 5
 
     local b = Instance.new("TextButton")
-    b.Size                  = size
-    b.Position              = pos
-    b.BackgroundColor3      = Color3.fromRGB(15, 15, 40)
+    b.Size                   = size
+    b.Position               = pos
+    b.BackgroundColor3       = Color3.fromRGB(15, 15, 40)
     b.BackgroundTransparency = 0.1
-    b.Text                  = text
-    b.TextColor3            = color
-    b.Font                  = Enum.Font.GothamSemibold
-    b.TextSize              = 13
-    b.BorderSizePixel       = 0
-    b.AutoButtonColor       = false
-    b.ZIndex                = zi
-    b.Parent                = parent
+    b.Text                   = text
+    b.TextColor3             = color
+    b.Font                   = Enum.Font.GothamSemibold
+    b.TextSize               = 13
+    b.BorderSizePixel        = 0
+    b.AutoButtonColor        = false
+    b.ZIndex                 = zi
+    b.Parent                 = parent
 
     local bc = Instance.new("UICorner")
     bc.CornerRadius = UDim.new(0, 8)
-    bc.Parent       = b
+    bc.Parent = b
 
     local sk = Instance.new("UIStroke")
     sk.Thickness = 1.5
@@ -191,7 +210,7 @@ local function neonBtn(parent, text, size, pos, color, zi)
             math.clamp(math.floor(color.B * 60), 0, 255)
         )}):Play()
         TweenService:Create(sk, TW_FAST, {Color = color, Thickness = 2.5}):Play()
-        TweenService:Create(b,  TW_FAST, {TextColor3 = Color3.new(1, 1, 1)}):Play()
+        TweenService:Create(b,  TW_FAST, {TextColor3 = Color3.new(1,1,1)}):Play()
     end)
     b.MouseLeave:Connect(function()
         TweenService:Create(b, TW_FAST, {BackgroundColor3 = Color3.fromRGB(15, 15, 40)}):Play()
@@ -285,7 +304,7 @@ local function selectTab(name)
 end
 
 for _, name in ipairs(TABS) do
-    local b, _ = neonBtn(Sidebar, name, UDim2.new(1, 0, 0, 44), UDim2.fromOffset(0, 0), TAB_COLORS[name], 4)
+    local b, _ = neonBtn(Sidebar, name, UDim2.new(1,0,0,44), UDim2.fromOffset(0,0), TAB_COLORS[name], 4)
     b.TextSize    = 14
     tabBtns[name] = b
     b.MouseButton1Click:Connect(function() selectTab(name) end)
@@ -294,18 +313,17 @@ end
 selectTab("Events")
 
 -- ═══════════ EVENTS TAB ═══════════
-local evScroll = makeScroll(tabFrames["Events"], UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0))
+local evScroll = makeScroll(tabFrames["Events"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
 
 local function refreshEvents()
-    for _, c in ipairs(evScroll:GetChildren()) do
-        if c:IsA("Frame") or c:IsA("TextLabel") then c:Destroy() end
+    for _, child in ipairs(evScroll:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextLabel") then child:Destroy() end
     end
 
     local count = 0
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
             count += 1
-
             local row = Instance.new("Frame")
             row.Size                   = UDim2.new(1, 0, 0, 46)
             row.BackgroundColor3       = BG_MID
@@ -317,7 +335,7 @@ local function refreshEvents()
 
             local rc = Instance.new("UICorner")
             rc.CornerRadius = UDim.new(0, 8)
-            rc.Parent       = row
+            rc.Parent = row
 
             local rs = Instance.new("UIStroke")
             rs.Thickness = 1
@@ -338,10 +356,7 @@ local function refreshEvents()
             lbl.Parent                 = row
 
             local fb, _ = neonBtn(row, "Fire",
-                UDim2.new(0, 70, 0, 30),
-                UDim2.new(1, -80, 0.5, -15),
-                NEON_CYAN, 7
-            )
+                UDim2.new(0, 70, 0, 30), UDim2.new(1, -80, 0.5, -15), NEON_CYAN, 7)
             fb.TextSize = 12
 
             local cap = obj
@@ -350,7 +365,7 @@ local function refreshEvents()
                 if ok then
                     TweenService:Create(fb, TW_FAST, {BackgroundColor3 = Color3.fromRGB(0, 60, 0)}):Play()
                     task.delay(0.6, function()
-                        TweenService:Create(fb, TW_FAST, {BackgroundColor3 = Color3.fromRGB(15, 15, 40)}):Play()
+                        TweenService:Create(fb, TW_FAST, {BackgroundColor3 = Color3.fromRGB(15,15,40)}):Play()
                     end)
                 end
             end)
@@ -361,7 +376,7 @@ local function refreshEvents()
         local e = Instance.new("TextLabel")
         e.Size                   = UDim2.new(1, 0, 0, 50)
         e.BackgroundTransparency = 1
-        e.Text                   = "No RemoteEvents in ReplicatedStorage"
+        e.Text                   = "Keine RemoteEvents in ReplicatedStorage"
         e.TextColor3             = Color3.fromRGB(100, 100, 150)
         e.Font                   = Enum.Font.Gotham
         e.TextSize               = 13
@@ -370,17 +385,17 @@ local function refreshEvents()
     end
 end
 
-local evRefBtn, _ = neonBtn(tabFrames["Events"], "⟳  Refresh",
-    UDim2.new(0, 120, 0, 26), UDim2.new(1, -128, 0, 6), NEON_PURPLE, 6)
-evRefBtn.TextSize = 12
-evRefBtn.MouseButton1Click:Connect(refreshEvents)
+local evRef, _ = neonBtn(tabFrames["Events"], "⟳  Refresh",
+    UDim2.new(0,120,0,26), UDim2.new(1,-128,0,6), NEON_PURPLE, 6)
+evRef.TextSize = 12
+evRef.MouseButton1Click:Connect(refreshEvents)
 
 -- ═══════════ TP TAB ═══════════
-local tpScroll = makeScroll(tabFrames["TP"], UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0))
+local tpScroll = makeScroll(tabFrames["TP"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
 
 local function refreshTP()
-    for _, c in ipairs(tpScroll:GetChildren()) do
-        if c:IsA("Frame") then c:Destroy() end
+    for _, child in ipairs(tpScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
     end
 
     for i, plr in ipairs(Players:GetPlayers()) do
@@ -395,7 +410,7 @@ local function refreshTP()
 
         local rc = Instance.new("UICorner")
         rc.CornerRadius = UDim.new(0, 8)
-        rc.Parent       = row
+        rc.Parent = row
 
         local rs = Instance.new("UIStroke")
         rs.Thickness = 1
@@ -412,7 +427,7 @@ local function refreshTP()
 
         local imgC = Instance.new("UICorner")
         imgC.CornerRadius = UDim.new(1, 0)
-        imgC.Parent       = img
+        imgC.Parent = img
 
         local imgSk = Instance.new("UIStroke")
         imgSk.Thickness = 1.5
@@ -422,9 +437,10 @@ local function refreshTP()
         local uid = plr.UserId
         task.spawn(function()
             local ok, url = pcall(function()
-                return Players:GetUserThumbnailAsync(uid, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+                return Players:GetUserThumbnailAsync(uid,
+                    Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
             end)
-            if ok then img.Image = url end
+            if ok and img and img.Parent then img.Image = url end
         end)
 
         local nl = Instance.new("TextLabel")
@@ -440,7 +456,7 @@ local function refreshTP()
         nl.Parent                 = row
 
         local tb, _ = neonBtn(row, "Teleport",
-            UDim2.new(0, 88, 0, 32), UDim2.new(1, -96, 0.5, -16), NEON_PINK, 7)
+            UDim2.new(0,88,0,32), UDim2.new(1,-96,0.5,-16), NEON_PINK, 7)
         tb.TextSize = 12
 
         local capPlr = plr
@@ -450,18 +466,16 @@ local function refreshTP()
             if ch and tch then
                 local h  = ch:FindFirstChild("HumanoidRootPart")
                 local th = tch:FindFirstChild("HumanoidRootPart")
-                if h and th then
-                    h.CFrame = th.CFrame + Vector3.new(2, 0, 2)
-                end
+                if h and th then h.CFrame = th.CFrame + Vector3.new(2, 0, 2) end
             end
         end)
     end
 end
 
-local tpRefBtn, _ = neonBtn(tabFrames["TP"], "⟳  Refresh",
-    UDim2.new(0, 120, 0, 26), UDim2.new(1, -128, 0, 6), NEON_PINK, 6)
-tpRefBtn.TextSize = 12
-tpRefBtn.MouseButton1Click:Connect(refreshTP)
+local tpRef, _ = neonBtn(tabFrames["TP"], "⟳  Refresh",
+    UDim2.new(0,120,0,26), UDim2.new(1,-128,0,6), NEON_PINK, 6)
+tpRef.TextSize = 12
+tpRef.MouseButton1Click:Connect(refreshTP)
 
 -- ═══════════ TPA TAB ═══════════
 local TF2 = tabFrames["TPA"]
@@ -492,7 +506,7 @@ posLbl.Parent                 = TF2
 
 local posC = Instance.new("UICorner")
 posC.CornerRadius = UDim.new(0, 8)
-posC.Parent       = posLbl
+posC.Parent = posLbl
 
 local posSk = Instance.new("UIStroke")
 posSk.Thickness = 1
@@ -500,7 +514,7 @@ posSk.Color     = Color3.fromRGB(60, 0, 120)
 posSk.Parent    = posLbl
 
 local svBtn, _ = neonBtn(TF2, "💾  Save Current Position",
-    UDim2.new(1, -40, 0, 44), UDim2.new(0, 20, 0, 124), NEON_PURPLE, 5)
+    UDim2.new(1,-40,0,44), UDim2.new(0,20,0,124), NEON_PURPLE, 5)
 svBtn.TextSize = 14
 svBtn.MouseButton1Click:Connect(function()
     local ch = LocalPlayer.Character
@@ -517,7 +531,7 @@ svBtn.MouseButton1Click:Connect(function()
 end)
 
 local goBtn, _ = neonBtn(TF2, "🚀  Go to Saved Position",
-    UDim2.new(1, -40, 0, 44), UDim2.new(0, 20, 0, 182), NEON_CYAN, 5)
+    UDim2.new(1,-40,0,44), UDim2.new(0,20,0,182), NEON_CYAN, 5)
 goBtn.TextSize = 14
 goBtn.MouseButton1Click:Connect(function()
     if savedPos then
@@ -527,13 +541,13 @@ goBtn.MouseButton1Click:Connect(function()
             if h then h.CFrame = savedPos end
         end
     else
-        posLbl.Text       = "⚠  Save a position first!"
+        posLbl.Text       = "⚠  Erst Position speichern!"
         posLbl.TextColor3 = NEON_PINK
     end
 end)
 
 local clrBtn, _ = neonBtn(TF2, "✕  Clear Saved Position",
-    UDim2.new(1, -40, 0, 36), UDim2.new(0, 20, 0, 240), NEON_PINK, 5)
+    UDim2.new(1,-40,0,36), UDim2.new(0,20,0,240), NEON_PINK, 5)
 clrBtn.TextSize = 13
 clrBtn.MouseButton1Click:Connect(function()
     savedPos          = nil
@@ -590,7 +604,8 @@ end)
 local hGui = Instance.new("ScreenGui")
 hGui.Name         = "AdminHint"
 hGui.ResetOnSpawn = false
-hGui.Parent       = PlayerGui
+pcall(function() hGui.DisplayOrder = 998 end)
+hGui.Parent = PlayerGui
 
 local badge = Instance.new("TextLabel")
 badge.Size                   = UDim2.fromOffset(170, 28)
@@ -605,7 +620,7 @@ badge.Parent                 = hGui
 
 local badgeC = Instance.new("UICorner")
 badgeC.CornerRadius = UDim.new(0, 6)
-badgeC.Parent       = badge
+badgeC.Parent = badge
 
 local badgeSk = Instance.new("UIStroke")
 badgeSk.Thickness = 1.5
