@@ -1,3 +1,31 @@
-game.ReplicatedStorage.MyEvent.OnServerEvent:Connect(function(player)
-    print(player.Name .. " hat das Event ausgelöst!")
+-- Event-System in EINEM Script
+
+local events = {}
+
+-- Event registrieren
+local function registerEvent(name, func)
+    events[name] = func
+end
+
+-- Event starten
+local function startEvent(name, ...)
+    if events[name] then
+        print("Event gestartet:", name)
+        events[name](...)
+    else
+        warn("Event existiert nicht:", name)
+    end
+end
+
+-- Beispiel-Events
+registerEvent("SpawnZombie", function()
+    print("Zombie würde jetzt spawnen!")
 end)
+
+registerEvent("GiveItem", function(item)
+    print("Item gegeben:", item)
+end)
+
+-- Events testen
+startEvent("SpawnZombie")
+startEvent("GiveItem", "Sword")
