@@ -1,7 +1,8 @@
 --[[
-    NEON ANIME GLOW ADMIN PANEL - FIXED VERSION
+    NEON ANIME GLOW ADMIN PANEL - INSTANT START VERSION
     Platzierung: StarterGui (als LocalScript)
     Taste: 'O' zum Öffnen/Schließen
+    Verhalten: Startet SOFORT beim Laden mit Animation
 ]]
 
 local Players = game:GetService("Players")
@@ -22,7 +23,7 @@ local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
 
 -- GUI Erstellung
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "B-AdminPanel_Fixed"
+ScreenGui.Name = "B-AdminPanel_Instant"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = playerGui
@@ -38,11 +39,11 @@ Blur.Parent = Lighting
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 600, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200) -- Startposition für Animation
 MainFrame.BackgroundColor3 = BG_COLOR
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
-MainFrame.Visible = false -- INITIAL UNSICHTBAR
+MainFrame.Visible = false -- Wird durch toggle() sofort sichtbar gemacht
 MainFrame.Parent = ScreenGui
 
 -- Corner & Border Glow
@@ -222,17 +223,23 @@ end)
 
 -- OPEN/CLOSE LOGIC
 local isOpen = false
-local function toggle()
+local function toggle(instant)
     isOpen = not isOpen
     if isOpen then
         refreshEvents()
         refreshPlayers()
         MainFrame.Visible = true
         Blur.Enabled = true
-        MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200)
-        TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -300, 0.5, -200)}):Play()
-        TweenService:Create(Blur, TweenInfo.new(0.5), {Size = 24}):Play()
         Tabs["Events"].Visible = true
+        
+        if instant then
+            MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+            Blur.Size = 24
+        else
+            MainFrame.Position = UDim2.new(0.5, -300, 0.6, -200)
+            TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -300, 0.5, -200)}):Play()
+            TweenService:Create(Blur, TweenInfo.new(0.5), {Size = 24}):Play()
+        end
     else
         TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 0}):Play()
         local t = TweenService:Create(MainFrame, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -300, 0.6, -200)})
@@ -245,8 +252,15 @@ local function toggle()
     end
 end
 
+-- Tastenkürzel
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == TASTE then toggle() end
 end)
 
-print("B-AdminPanel Fixed geladen. Drücke 'O'.")
+-- SOFORTIGER START BEIM LADEN
+task.spawn(function()
+    task.wait(0.1) -- Kurze Pause für saubere Initialisierung
+    toggle(false) -- Startet mit Animation
+end)
+
+print("B-AdminPanel Instant geladen. Drücke 'O' zum Schließen.")
