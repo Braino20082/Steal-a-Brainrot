@@ -1,375 +1,192 @@
-local Players           = game:GetService("Players")
-local TweenService      = game:GetService("TweenService")
-local RunService        = game:GetService("RunService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer
 repeat LocalPlayer = Players.LocalPlayer task.wait() until LocalPlayer
-
 local PlayerGui
 repeat PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") task.wait() until PlayerGui
 
-local old = PlayerGui:FindFirstChild("NeonAdminPanel")
+-- Altes entfernen
+local old = PlayerGui:FindFirstChild("EventPanel")
 if old then old:Destroy() end
-local oldHint = PlayerGui:FindFirstChild("AdminHint")
-if oldHint then oldHint:Destroy() end
 
-local NEON_CYAN   = Color3.fromRGB(0, 255, 255)
-local NEON_PINK   = Color3.fromRGB(255, 0, 200)
-local NEON_PURPLE = Color3.fromRGB(140, 0, 255)
-local BG_DARK     = Color3.fromRGB(8, 8, 20)
-local BG_MID      = Color3.fromRGB(15, 15, 35)
-local BG_LIGHT    = Color3.fromRGB(22, 22, 50)
-local TEXT_WHITE  = Color3.fromRGB(220, 220, 255)
-local SIDEBAR_BG  = Color3.fromRGB(10, 10, 28)
+-- Farben
+local BG     = Color3.fromRGB(10, 10, 25)
+local BG2    = Color3.fromRGB(18, 18, 40)
+local CYAN   = Color3.fromRGB(0, 220, 255)
+local WHITE  = Color3.fromRGB(220, 220, 255)
 
-local TW_OPEN  = TweenInfo.new(0.45, Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
-local TW_FAST  = TweenInfo.new(0.18, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
+-- ScreenGui
+local sg = Instance.new("ScreenGui")
+sg.Name = "EventPanel"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() sg.DisplayOrder = 999 end)
+sg.Parent = PlayerGui
 
-local currentTab = "Events"
+-- Hauptframe
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(500, 400)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+frame.BackgroundColor3 = BG
+frame.BorderSizePixel = 0
+frame.Parent = sg
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name            = "NeonAdminPanel"
-ScreenGui.ResetOnSpawn    = false
-ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
-ScreenGui.IgnoreGuiInset  = true
-pcall(function() ScreenGui.DisplayOrder = 999 end)
-ScreenGui.Parent          = PlayerGui
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
 
-local Main = Instance.new("Frame")
-Main.Size             = UDim2.fromOffset(0, 0)
-Main.AnchorPoint      = Vector2.new(0.5, 0.5)
-Main.Position         = UDim2.new(0.5, 0, 0.5, 0)
-Main.BackgroundColor3 = BG_DARK
-Main.BorderSizePixel  = 0
-Main.Visible          = true
-Main.ZIndex           = 2
-Main.Parent           = ScreenGui
+local stroke = Instance.new("UIStroke")
+stroke.Color = CYAN
+stroke.Thickness = 2
+stroke.Parent = frame
 
-local c1 = Instance.new("UICorner")
-c1.CornerRadius = UDim.new(0, 14)
-c1.Parent = Main
+-- Titel
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 44)
+title.BackgroundColor3 = BG2
+title.BorderSizePixel = 0
+title.Text = "⚡  Remote Events"
+title.TextColor3 = CYAN
+title.Font = Enum.Font.GothamBold
+title.TextSize = 17
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 2
+title.Parent = frame
 
-local BorderStroke = Instance.new("UIStroke")
-BorderStroke.Thickness       = 2.5
-BorderStroke.Color           = NEON_CYAN
-BorderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-BorderStroke.Parent          = Main
+local titlePad = Instance.new("UIPadding")
+titlePad.PaddingLeft = UDim.new(0, 14)
+titlePad.Parent = title
 
-local TitleBar = Instance.new("Frame")
-TitleBar.Size             = UDim2.new(1, 0, 0, 44)
-TitleBar.BackgroundColor3 = BG_MID
-TitleBar.BorderSizePixel  = 0
-TitleBar.ZIndex           = 3
-TitleBar.Parent           = Main
+local tc = Instance.new("UICorner")
+tc.CornerRadius = UDim.new(0, 12)
+tc.Parent = title
 
-local c2 = Instance.new("UICorner")
-c2.CornerRadius = UDim.new(0, 14)
-c2.Parent = TitleBar
+local tcFill = Instance.new("Frame")
+tcFill.Size = UDim2.new(1, 0, 0, 12)
+tcFill.Position = UDim2.new(0, 0, 1, -12)
+tcFill.BackgroundColor3 = BG2
+tcFill.BorderSizePixel = 0
+tcFill.ZIndex = 2
+tcFill.Parent = title
 
-local titleFill = Instance.new("Frame")
-titleFill.Size             = UDim2.new(1, 0, 0, 14)
-titleFill.Position         = UDim2.new(0, 0, 1, -14)
-titleFill.BackgroundColor3 = BG_MID
-titleFill.BorderSizePixel  = 0
-titleFill.ZIndex           = 3
-titleFill.Parent           = TitleBar
+-- ScrollFrame
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -16, 1, -54)
+scroll.Position = UDim2.new(0, 8, 0, 50)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4
+scroll.ScrollBarImageColor3 = CYAN
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.CanvasSize = UDim2.new()
+scroll.ZIndex = 2
+scroll.Parent = frame
 
-local TitleLbl = Instance.new("TextLabel")
-TitleLbl.Size                  = UDim2.new(1, 0, 1, 0)
-TitleLbl.Position              = UDim2.new(0, 16, 0, 0)
-TitleLbl.BackgroundTransparency = 1
-TitleLbl.Text                  = "⚡  NEON ADMIN  ⚡"
-TitleLbl.TextColor3            = NEON_CYAN
-TitleLbl.Font                  = Enum.Font.GothamBold
-TitleLbl.TextSize              = 18
-TitleLbl.TextXAlignment        = Enum.TextXAlignment.Left
-TitleLbl.ZIndex                = 4
-TitleLbl.Parent                = TitleBar
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 6)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = scroll
 
-local Sidebar = Instance.new("Frame")
-Sidebar.Size             = UDim2.new(0, 120, 1, -44)
-Sidebar.Position         = UDim2.new(0, 0, 0, 44)
-Sidebar.BackgroundColor3 = SIDEBAR_BG
-Sidebar.BorderSizePixel  = 0
-Sidebar.ZIndex           = 3
-Sidebar.Parent           = Main
+local pad = Instance.new("UIPadding")
+pad.PaddingTop = UDim.new(0, 6)
+pad.PaddingBottom = UDim.new(0, 6)
+pad.Parent = scroll
 
-local sideStroke = Instance.new("UIStroke")
-sideStroke.Color     = Color3.fromRGB(30, 30, 70)
-sideStroke.Thickness = 1
-sideStroke.Parent    = Sidebar
+-- Events laden
+local count = 0
+for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        count += 1
 
-local sideLayout = Instance.new("UIListLayout")
-sideLayout.Padding             = UDim.new(0, 6)
-sideLayout.SortOrder           = Enum.SortOrder.LayoutOrder
-sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-sideLayout.Parent              = Sidebar
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, 0, 0, 44)
+        row.BackgroundColor3 = BG2
+        row.BorderSizePixel = 0
+        row.LayoutOrder = count
+        row.ZIndex = 3
+        row.Parent = scroll
 
-local sidePad = Instance.new("UIPadding")
-sidePad.PaddingTop   = UDim.new(0, 14)
-sidePad.PaddingLeft  = UDim.new(0, 8)
-sidePad.PaddingRight = UDim.new(0, 8)
-sidePad.Parent       = Sidebar
+        local rc = Instance.new("UICorner")
+        rc.CornerRadius = UDim.new(0, 8)
+        rc.Parent = row
 
-local Content = Instance.new("Frame")
-Content.Size                   = UDim2.new(1, -120, 1, -44)
-Content.Position               = UDim2.new(0, 120, 0, 44)
-Content.BackgroundColor3       = BG_LIGHT
-Content.BackgroundTransparency = 0.3
-Content.BorderSizePixel        = 0
-Content.ClipsDescendants       = true
-Content.ZIndex                 = 3
-Content.Parent                 = Main
+        local rs = Instance.new("UIStroke")
+        rs.Color = Color3.fromRGB(30, 30, 80)
+        rs.Thickness = 1
+        rs.Parent = row
 
-local function neonBtn(parent, text, size, pos, color, zi)
-    color = color or NEON_CYAN
-    zi    = zi    or 5
-    local b = Instance.new("TextButton")
-    b.Size                   = size
-    b.Position               = pos
-    b.BackgroundColor3       = Color3.fromRGB(15, 15, 40)
-    b.BackgroundTransparency = 0.1
-    b.Text                   = text
-    b.TextColor3             = color
-    b.Font                   = Enum.Font.GothamSemibold
-    b.TextSize               = 13
-    b.BorderSizePixel        = 0
-    b.AutoButtonColor        = false
-    b.ZIndex                 = zi
-    b.Parent                 = parent
-    local bc = Instance.new("UICorner")
-    bc.CornerRadius = UDim.new(0, 8)
-    bc.Parent = b
-    local sk = Instance.new("UIStroke")
-    sk.Thickness = 1.5
-    sk.Color     = Color3.fromRGB(math.floor(color.R*255*0.4), math.floor(color.G*255*0.4), math.floor(color.B*255*0.4))
-    sk.Parent = b
-    b.MouseEnter:Connect(function()
-        TweenService:Create(b,  TW_FAST, {BackgroundColor3 = Color3.fromRGB(math.clamp(math.floor(color.R*60),0,255), math.clamp(math.floor(color.G*60),0,255), math.clamp(math.floor(color.B*60),0,255))}):Play()
-        TweenService:Create(sk, TW_FAST, {Color = color, Thickness = 2.5}):Play()
-        TweenService:Create(b,  TW_FAST, {TextColor3 = Color3.new(1,1,1)}):Play()
-    end)
-    b.MouseLeave:Connect(function()
-        TweenService:Create(b,  TW_FAST, {BackgroundColor3 = Color3.fromRGB(15,15,40)}):Play()
-        TweenService:Create(sk, TW_FAST, {Color = Color3.fromRGB(math.floor(color.R*255*0.4), math.floor(color.G*255*0.4), math.floor(color.B*255*0.4)), Thickness = 1.5}):Play()
-        TweenService:Create(b,  TW_FAST, {TextColor3 = color}):Play()
-    end)
-    return b, sk
-end
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -110, 1, 0)
+        lbl.Position = UDim2.new(0, 12, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "🔗  " .. obj.Name
+        lbl.TextColor3 = WHITE
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 13
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextTruncate = Enum.TextTruncate.AtEnd
+        lbl.ZIndex = 4
+        lbl.Parent = row
 
-local function makeScroll(parent, size, pos)
-    local s = Instance.new("ScrollingFrame")
-    s.Size                  = size
-    s.Position              = pos
-    s.BackgroundTransparency = 1
-    s.BorderSizePixel       = 0
-    s.ScrollBarThickness    = 4
-    s.ScrollBarImageColor3  = NEON_CYAN
-    s.AutomaticCanvasSize   = Enum.AutomaticSize.Y
-    s.CanvasSize            = UDim2.new()
-    s.ZIndex                = 5
-    s.Parent                = parent
-    local l = Instance.new("UIListLayout")
-    l.Padding   = UDim.new(0, 8)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.Parent    = s
-    local p = Instance.new("UIPadding")
-    p.PaddingLeft=UDim.new(0,10); p.PaddingRight=UDim.new(0,10)
-    p.PaddingTop=UDim.new(0,10);  p.PaddingBottom=UDim.new(0,10)
-    p.Parent = s
-    return s
-end
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 80, 0, 30)
+        btn.Position = UDim2.new(1, -88, 0.5, -15)
+        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 40)
+        btn.Text = "Fire"
+        btn.TextColor3 = CYAN
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 13
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.ZIndex = 4
+        btn.Parent = row
 
-local TABS       = {"Events", "TP", "TPA"}
-local TAB_COLORS = {Events = NEON_CYAN, TP = NEON_PINK, TPA = NEON_PURPLE}
-local tabFrames  = {}
-local tabBtns    = {}
+        local bc = Instance.new("UICorner")
+        bc.CornerRadius = UDim.new(0, 7)
+        bc.Parent = btn
 
-for _, name in ipairs(TABS) do
-    local f = Instance.new("Frame")
-    f.Size                   = UDim2.fromScale(1, 1)
-    f.BackgroundTransparency = 1
-    f.Visible                = (name == "Events")
-    f.ZIndex                 = 4
-    f.Parent                 = Content
-    tabFrames[name]          = f
-end
+        local bsk = Instance.new("UIStroke")
+        bsk.Color = Color3.fromRGB(0, 100, 120)
+        bsk.Thickness = 1.5
+        bsk.Parent = btn
 
-local function selectTab(name)
-    currentTab = name
-    for _, n in ipairs(TABS) do
-        tabFrames[n].Visible = (n == name)
-        local btn = tabBtns[n]
-        if not btn then continue end
-        local sk = btn:FindFirstChildWhichIsA("UIStroke")
-        local c  = TAB_COLORS[n]
-        if n == name then
-            TweenService:Create(btn, TW_FAST, {BackgroundColor3 = Color3.fromRGB(math.floor(c.R*60), math.floor(c.G*60), math.floor(c.B*60))}):Play()
-            if sk then TweenService:Create(sk, TW_FAST, {Color = c, Thickness = 2.5}):Play() end
-        else
-            TweenService:Create(btn, TW_FAST, {BackgroundColor3 = Color3.fromRGB(15,15,40)}):Play()
-            if sk then TweenService:Create(sk, TW_FAST, {Color = Color3.fromRGB(math.floor(c.R*255*0.3), math.floor(c.G*255*0.3), math.floor(c.B*255*0.3)), Thickness = 1.5}):Play() end
-        end
-    end
-end
+        local TW = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-for _, name in ipairs(TABS) do
-    local b, _ = neonBtn(Sidebar, name, UDim2.new(1,0,0,44), UDim2.fromOffset(0,0), TAB_COLORS[name], 4)
-    b.TextSize    = 14
-    tabBtns[name] = b
-    b.MouseButton1Click:Connect(function() selectTab(name) end)
-end
-selectTab("Events")
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TW, {BackgroundColor3 = Color3.fromRGB(0, 50, 70)}):Play()
+            TweenService:Create(bsk, TW, {Color = CYAN, Thickness = 2.5}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TW, {BackgroundColor3 = Color3.fromRGB(15,15,40)}):Play()
+            TweenService:Create(bsk, TW, {Color = Color3.fromRGB(0,100,120), Thickness = 1.5}):Play()
+        end)
 
--- EVENTS TAB
-local evScroll = makeScroll(tabFrames["Events"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
-
-local function refreshEvents()
-    for _, child in ipairs(evScroll:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextLabel") then child:Destroy() end
-    end
-    local count = 0
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            count += 1
-            local row = Instance.new("Frame")
-            row.Size=UDim2.new(1,0,0,46); row.BackgroundColor3=BG_MID
-            row.BackgroundTransparency=0.2; row.BorderSizePixel=0
-            row.LayoutOrder=count; row.ZIndex=6; row.Parent=evScroll
-            local rc=Instance.new("UICorner"); rc.CornerRadius=UDim.new(0,8); rc.Parent=row
-            local rs=Instance.new("UIStroke"); rs.Thickness=1; rs.Color=Color3.fromRGB(30,30,80); rs.Parent=row
-            local lbl=Instance.new("TextLabel")
-            lbl.Size=UDim2.new(1,-100,1,0); lbl.Position=UDim2.new(0,12,0,0)
-            lbl.BackgroundTransparency=1; lbl.Text="🔗 "..obj.Name
-            lbl.TextColor3=TEXT_WHITE; lbl.Font=Enum.Font.Gotham; lbl.TextSize=13
-            lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.TextTruncate=Enum.TextTruncate.AtEnd
-            lbl.ZIndex=7; lbl.Parent=row
-            local fb,_=neonBtn(row,"Fire",UDim2.new(0,70,0,30),UDim2.new(1,-80,0.5,-15),NEON_CYAN,7)
-            fb.TextSize=12
-            local cap=obj
-            fb.MouseButton1Click:Connect(function()
-                local ok=pcall(function() cap:FireServer() end)
-                if ok then
-                    TweenService:Create(fb,TW_FAST,{BackgroundColor3=Color3.fromRGB(0,60,0)}):Play()
-                    task.delay(0.6,function() TweenService:Create(fb,TW_FAST,{BackgroundColor3=Color3.fromRGB(15,15,40)}):Play() end)
-                end
+        local capObj = obj
+        local capRow = row
+        btn.MouseButton1Click:Connect(function()
+            pcall(function() capObj:FireServer() end)
+            TweenService:Create(capRow, TW, {BackgroundColor3 = Color3.fromRGB(0, 50, 20)}):Play()
+            task.delay(0.5, function()
+                TweenService:Create(capRow, TW, {BackgroundColor3 = BG2}):Play()
             end)
-        end
-    end
-    if count == 0 then
-        local e=Instance.new("TextLabel"); e.Size=UDim2.new(1,0,0,50)
-        e.BackgroundTransparency=1; e.Text="Keine RemoteEvents gefunden"
-        e.TextColor3=Color3.fromRGB(100,100,150); e.Font=Enum.Font.Gotham; e.TextSize=13; e.ZIndex=6; e.Parent=evScroll
-    end
-end
-
-local evRef,_=neonBtn(tabFrames["Events"],"⟳  Refresh",UDim2.new(0,120,0,26),UDim2.new(1,-128,0,6),NEON_PURPLE,6)
-evRef.TextSize=12; evRef.MouseButton1Click:Connect(refreshEvents)
-
--- TP TAB
-local tpScroll = makeScroll(tabFrames["TP"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
-
-local function refreshTP()
-    for _, child in ipairs(tpScroll:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-    for i, plr in ipairs(Players:GetPlayers()) do
-        local row=Instance.new("Frame")
-        row.Size=UDim2.new(1,0,0,58); row.BackgroundColor3=BG_MID
-        row.BackgroundTransparency=0.2; row.BorderSizePixel=0
-        row.LayoutOrder=i; row.ZIndex=6; row.Parent=tpScroll
-        local rc=Instance.new("UICorner"); rc.CornerRadius=UDim.new(0,8); rc.Parent=row
-        local rs=Instance.new("UIStroke"); rs.Thickness=1; rs.Color=Color3.fromRGB(30,30,80); rs.Parent=row
-        local img=Instance.new("ImageLabel")
-        img.Size=UDim2.fromOffset(44,44); img.Position=UDim2.new(0,8,0.5,-22)
-        img.BackgroundColor3=Color3.fromRGB(20,20,50); img.BorderSizePixel=0; img.ZIndex=7; img.Parent=row
-        local imgC=Instance.new("UICorner"); imgC.CornerRadius=UDim.new(1,0); imgC.Parent=img
-        local imgSk=Instance.new("UIStroke"); imgSk.Thickness=1.5; imgSk.Color=NEON_PINK; imgSk.Parent=img
-        local uid=plr.UserId
-        task.spawn(function()
-            local ok,url=pcall(function() return Players:GetUserThumbnailAsync(uid,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size48x48) end)
-            if ok and img and img.Parent then img.Image=url end
-        end)
-        local nl=Instance.new("TextLabel")
-        nl.Size=UDim2.new(1,-170,1,0); nl.Position=UDim2.new(0,60,0,0)
-        nl.BackgroundTransparency=1; nl.Text=plr.DisplayName.."\n@"..plr.Name
-        nl.TextColor3=TEXT_WHITE; nl.Font=Enum.Font.GothamSemibold; nl.TextSize=12
-        nl.TextXAlignment=Enum.TextXAlignment.Left; nl.ZIndex=7; nl.Parent=row
-        local tb,_=neonBtn(row,"Teleport",UDim2.new(0,88,0,32),UDim2.new(1,-96,0.5,-16),NEON_PINK,7)
-        tb.TextSize=12
-        local capPlr=plr
-        tb.MouseButton1Click:Connect(function()
-            local ch=LocalPlayer.Character; local tch=capPlr.Character
-            if ch and tch then
-                local h=ch:FindFirstChild("HumanoidRootPart"); local th=tch:FindFirstChild("HumanoidRootPart")
-                if h and th then h.CFrame=th.CFrame+Vector3.new(2,0,2) end
-            end
         end)
     end
 end
 
-local tpRef,_=neonBtn(tabFrames["TP"],"⟳  Refresh",UDim2.new(0,120,0,26),UDim2.new(1,-128,0,6),NEON_PINK,6)
-tpRef.TextSize=12; tpRef.MouseButton1Click:Connect(refreshTP)
+-- Leer-Anzeige
+if count == 0 then
+    local empty = Instance.new("TextLabel")
+    empty.Size = UDim2.new(1, 0, 0, 50)
+    empty.BackgroundTransparency = 1
+    empty.Text = "Keine RemoteEvents in ReplicatedStorage gefunden."
+    empty.TextColor3 = Color3.fromRGB(120, 120, 160)
+    empty.Font = Enum.Font.Gotham
+    empty.TextSize = 13
+    empty.ZIndex = 3
+    empty.Parent = scroll
+end
 
--- TPA TAB
-local TF2=tabFrames["TPA"]
-local tpaTitle=Instance.new("TextLabel")
-tpaTitle.Size=UDim2.new(1,0,0,40); tpaTitle.Position=UDim2.new(0,0,0,16)
-tpaTitle.BackgroundTransparency=1; tpaTitle.Text="📍  Teleport Anchor"
-tpaTitle.TextColor3=NEON_PURPLE; tpaTitle.Font=Enum.Font.GothamBold; tpaTitle.TextSize=18; tpaTitle.ZIndex=5; tpaTitle.Parent=TF2
-
-local savedPos=nil
-local posLbl=Instance.new("TextLabel")
-posLbl.Size=UDim2.new(1,-40,0,36); posLbl.Position=UDim2.new(0,20,0,70)
-posLbl.BackgroundColor3=BG_MID; posLbl.BackgroundTransparency=0.1
-posLbl.Text="No position saved"; posLbl.TextColor3=Color3.fromRGB(120,120,180)
-posLbl.Font=Enum.Font.Code; posLbl.TextSize=13; posLbl.BorderSizePixel=0; posLbl.ZIndex=5; posLbl.Parent=TF2
-local posC=Instance.new("UICorner"); posC.CornerRadius=UDim.new(0,8); posC.Parent=posLbl
-local posSk=Instance.new("UIStroke"); posSk.Thickness=1; posSk.Color=Color3.fromRGB(60,0,120); posSk.Parent=posLbl
-
-local svBtn,_=neonBtn(TF2,"💾  Save Current Position",UDim2.new(1,-40,0,44),UDim2.new(0,20,0,124),NEON_PURPLE,5)
-svBtn.TextSize=14
-svBtn.MouseButton1Click:Connect(function()
-    local ch=LocalPlayer.Character
-    if ch then local h=ch:FindFirstChild("HumanoidRootPart")
-        if h then savedPos=h.CFrame; local p=h.Position
-            posLbl.Text=("X: %.1f   Y: %.1f   Z: %.1f"):format(p.X,p.Y,p.Z)
-            posLbl.TextColor3=NEON_PURPLE; TweenService:Create(posSk,TW_FAST,{Color=NEON_PURPLE}):Play()
-        end
-    end
-end)
-
-local goBtn,_=neonBtn(TF2,"🚀  Go to Saved Position",UDim2.new(1,-40,0,44),UDim2.new(0,20,0,182),NEON_CYAN,5)
-goBtn.TextSize=14
-goBtn.MouseButton1Click:Connect(function()
-    if savedPos then local ch=LocalPlayer.Character
-        if ch then local h=ch:FindFirstChild("HumanoidRootPart"); if h then h.CFrame=savedPos end end
-    else posLbl.Text="⚠  Erst Position speichern!"; posLbl.TextColor3=NEON_PINK end
-end)
-
-local clrBtn,_=neonBtn(TF2,"✕  Clear Saved Position",UDim2.new(1,-40,0,36),UDim2.new(0,20,0,240),NEON_PINK,5)
-clrBtn.TextSize=13
-clrBtn.MouseButton1Click:Connect(function()
-    savedPos=nil; posLbl.Text="No position saved"
-    posLbl.TextColor3=Color3.fromRGB(120,120,180)
-    TweenService:Create(posSk,TW_FAST,{Color=Color3.fromRGB(60,0,120)}):Play()
-end)
-
--- ANIMATED BORDER
-local hue=0
-RunService.Heartbeat:Connect(function(dt)
-    hue=(hue+dt*0.3)%1
-    BorderStroke.Color=Color3.fromHSV(hue,1,1)
-end)
-
--- AUTO OPEN mit Animation
-task.wait(0.5)
-refreshEvents()
-refreshTP()
-TweenService:Create(Main, TW_OPEN, {
-    Size     = UDim2.fromOffset(720, 450),
-    Position = UDim2.new(0.5, -360, 0.5, -225)
-}):Play()
-
-print("✅ Neon Admin Panel geöffnet!")
+print("✅ Event Panel geladen — " .. count .. " Events gefunden.")
