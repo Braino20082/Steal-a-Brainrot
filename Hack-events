@@ -1,12 +1,10 @@
 --[[
-    NEON ANIME GLOW ADMIN PANEL - FIXED VERSION
-    Platzierung: StarterPlayerScripts (als LocalScript)
+    BrainrotV1 - Admin Panel
+    Platzierung: StarterPlayerScripts (LocalScript)
     Taste: 'O' zum Öffnen/Schließen
 ]]
 
--- CoreGui & alle möglichen Fehler abfangen
 pcall(function() game:GetService("CoreGui") end)
-pcall(function() game:GetService("StarterGui"):SetCore("ResetButtonCallback", false) end)
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -24,46 +22,45 @@ if not player then
 end
 
 local playerGui = player:WaitForChild("PlayerGui", 15)
-if not playerGui then
-    warn("[AdminPanel] PlayerGui nicht gefunden - Abbruch.")
-    return
-end
+if not playerGui then return end
 
 local TASTE = Enum.KeyCode.O
 local BG_COLOR = Color3.fromRGB(15, 15, 20)
 local ACCENT_COLOR = Color3.fromRGB(30, 30, 40)
 local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
 
--- Altes GUI entfernen
 pcall(function()
-    local oldGui = playerGui:FindFirstChild("B-AdminPanel_Final")
-    if oldGui then oldGui:Destroy() end
+    local old = playerGui:FindFirstChild("BrainrotV1")
+    if old then old:Destroy() end
 end)
 
+-- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "B-AdminPanel_Final"
+ScreenGui.Name = "BrainrotV1"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 1000
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = playerGui
 
+-- Main Frame - startet klein in der Mitte, animiert auf 50% Bildschirm
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 600, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -300, 0.7, -200)
+MainFrame.Size = UDim2.new(0, 0, 0, 0) -- startet bei 0 für Animation
+MainFrame.Position = UDim2.new(0.25, 0, 0.25, 0) -- zentriert für 50% screen
 MainFrame.BackgroundColor3 = BG_COLOR
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
-MainFrame.Visible = false
+MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 2
-UIStroke.Transparency = 0.5
+UIStroke.Transparency = 0.3
 UIStroke.Parent = MainFrame
 
+-- Animierter Neon Border
 task.spawn(function()
     while MainFrame and MainFrame.Parent do
         pcall(function()
@@ -73,42 +70,56 @@ task.spawn(function()
     end
 end)
 
+-- Titel
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -80, 0, 45)
+titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "⚡ BrainrotV1"
+titleLabel.TextColor3 = Color3.fromRGB(220, 0, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 22
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = MainFrame
+
+-- Schließen Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 35, 0, 35)
+closeBtn.Position = UDim2.new(1, -45, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = TEXT_COLOR
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 16
+closeBtn.ZIndex = 10
+closeBtn.Parent = MainFrame
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Trennlinie
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -20, 0, 1)
+divider.Position = UDim2.new(0, 10, 0, 46)
+divider.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+divider.BorderSizePixel = 0
+divider.Parent = MainFrame
+
+-- Sidebar
 local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 150, 1, 0)
+Sidebar.Size = UDim2.new(0, 140, 1, -55)
+Sidebar.Position = UDim2.new(0, 0, 0, 50)
 Sidebar.BackgroundColor3 = ACCENT_COLOR
 Sidebar.BorderSizePixel = 0
 Sidebar.Parent = MainFrame
 Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 150, 0, 30)
-titleLabel.Position = UDim2.new(0, 160, 0, 5)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "✦ Admin Panel"
-titleLabel.TextColor3 = Color3.fromRGB(220, 0, 255)
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 16
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = MainFrame
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = TEXT_COLOR
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-closeBtn.ZIndex = 10
-closeBtn.Parent = MainFrame
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-
+-- Content Area
 local Content = Instance.new("Frame")
-Content.Position = UDim2.new(0, 160, 0, 40)
-Content.Size = UDim2.new(1, -170, 1, -50)
+Content.Position = UDim2.new(0, 150, 0, 55)
+Content.Size = UDim2.new(1, -160, 1, -65)
 Content.BackgroundTransparency = 1
 Content.Parent = MainFrame
 
+-- Tabs
 local Tabs = {}
 local function createTab(name)
     local TabFrame = Instance.new("ScrollingFrame")
@@ -132,39 +143,49 @@ local EventsTab = createTab("Events")
 local TPTab = createTab("TP")
 local TPATab = createTab("TPA")
 
-local function createSidebarButton(name, order)
+-- Sidebar Buttons
+local activeBtn = nil
+local function createSidebarButton(name, order, icon)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0, 10 + (order * 50))
+    btn.Size = UDim2.new(0.88, 0, 0, 42)
+    btn.Position = UDim2.new(0.06, 0, 0, 10 + (order * 52))
     btn.BackgroundColor3 = BG_COLOR
-    btn.Text = name
+    btn.Text = icon .. " " .. name
     btn.TextColor3 = TEXT_COLOR
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.Parent = Sidebar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
     btn.MouseButton1Click:Connect(function()
         for _, tab in pairs(Tabs) do tab.Visible = false end
         if Tabs[name] then Tabs[name].Visible = true end
+        if activeBtn then
+            TweenService:Create(activeBtn, TweenInfo.new(0.15), {BackgroundColor3 = BG_COLOR}):Play()
+        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 0, 120)}):Play()
+        activeBtn = btn
     end)
+    return btn
 end
 
-createSidebarButton("Events", 0)
-createSidebarButton("TP", 1)
-createSidebarButton("TPA", 2)
+local eventsBtn = createSidebarButton("Events", 0, "🔥")
+local tpBtn = createSidebarButton("TP", 1, "🌀")
+createSidebarButton("TPA", 2, "📍")
 
+-- Content Button Helper
 local function createContentButton(parent, text, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.Size = UDim2.new(1, -10, 0, 38)
     btn.BackgroundColor3 = ACCENT_COLOR
     btn.Text = text
     btn.TextColor3 = TEXT_COLOR
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
     btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 0, 80)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(70, 0, 100)}):Play()
     end)
     btn.MouseLeave:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = ACCENT_COLOR}):Play()
@@ -216,11 +237,11 @@ local function refreshPlayers()
             if p ~= player then
                 found = true
                 local frame = Instance.new("Frame")
-                frame.Size = UDim2.new(1, -10, 0, 50)
+                frame.Size = UDim2.new(1, -10, 0, 52)
                 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
                 frame.BorderSizePixel = 0
                 frame.Parent = TPTab
-                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
                 local nameLabel = Instance.new("TextLabel")
                 nameLabel.Size = UDim2.new(0.6, 0, 1, 0)
@@ -233,18 +254,18 @@ local function refreshPlayers()
                 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
                 nameLabel.Parent = frame
 
-                local tpBtn = Instance.new("TextButton")
-                tpBtn.Size = UDim2.new(0, 60, 0, 30)
-                tpBtn.Position = UDim2.new(1, -70, 0.5, -15)
-                tpBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-                tpBtn.Text = "TP"
-                tpBtn.TextColor3 = TEXT_COLOR
-                tpBtn.Font = Enum.Font.GothamBold
-                tpBtn.TextSize = 13
-                tpBtn.Parent = frame
-                Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+                local tpButton = Instance.new("TextButton")
+                tpButton.Size = UDim2.new(0, 65, 0, 32)
+                tpButton.Position = UDim2.new(1, -75, 0.5, -16)
+                tpButton.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+                tpButton.Text = "🌀 TP"
+                tpButton.TextColor3 = TEXT_COLOR
+                tpButton.Font = Enum.Font.GothamBold
+                tpButton.TextSize = 13
+                tpButton.Parent = frame
+                Instance.new("UICorner", tpButton).CornerRadius = UDim.new(0, 6)
 
-                tpBtn.MouseButton1Click:Connect(function()
+                tpButton.MouseButton1Click:Connect(function()
                     pcall(function()
                         if p.Character and p.Character:FindFirstChild("HumanoidRootPart")
                             and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -294,15 +315,16 @@ local function buildTPAButtons()
 end
 buildTPAButtons()
 
--- Toggle Logik
+-- Öffnen / Schließen
 local isOpen = false
 local isTweening = false
 
 local function closePanel()
     if isTweening then return end
     isTweening = true
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        Position = UDim2.new(0.5, -300, 0.7, -200)
+    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
     })
     tween:Play()
     tween.Completed:Connect(function()
@@ -316,12 +338,20 @@ local function openPanel()
     isTweening = true
     refreshEvents()
     refreshPlayers()
-    MainFrame.Visible = true
     for _, tab in pairs(Tabs) do tab.Visible = false end
     EventsTab.Visible = true
-    MainFrame.Position = UDim2.new(0.5, -300, 0.7, -200)
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.new(0.5, -300, 0.5, -200)
+    -- Events Button als aktiv markieren
+    TweenService:Create(eventsBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 0, 120)}):Play()
+    activeBtn = eventsBtn
+
+    MainFrame.Visible = true
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+    -- Animiert auf 50% des Bildschirms
+    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0.5, 0, 0.5, 0),
+        Position = UDim2.new(0.25, 0, 0.25, 0)
     })
     tween:Play()
     tween.Completed:Connect(function() isTweening = false end)
@@ -343,9 +373,11 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
+-- Direkt beim Start öffnen
 task.spawn(function()
-    task.wait(0.5)
-    pcall(toggle)
+    task.wait(0.3)
+    pcall(openPanel)
+    isOpen = true
 end)
 
-print("[AdminPanel] ✅ Geladen. Taste 'O' zum Öffnen/Schließen.")
+print("[BrainrotV1] ✅ Geladen. Taste 'O' zum Öffnen/Schließen.")
