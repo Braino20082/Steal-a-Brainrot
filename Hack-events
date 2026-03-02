@@ -1,370 +1,414 @@
---[[
-    BrainrotV1 - Admin Panel
-    Platzierung: StarterPlayerScripts (LocalScript)
-    Taste: 'O' zum Öffnen/Schließen
-]]
+-- ╔══════════════════════════════════════════╗
+-- ║        NEON ANIME ADMIN PANEL            ║
+-- ║     LocalScript → StarterGui             ║
+-- ╚══════════════════════════════════════════╝
 
--- Alle möglichen CoreGui Fehler global abfangen
-local oldError = error
-error = function(msg, level)
-    if type(msg) == "string" and msg:find("CoreGui") then return end
-    oldError(msg, level)
-end
-
-pcall(function() game:GetService("CoreGui") end)
-pcall(function() game:GetService("StarterGui"):SetCore("ResetButtonCallback", false) end)
-pcall(function() game:GetService("StarterGui"):SetCore("ChatActive", false) end)
-
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local Players          = game:GetService("Players")
+local TweenService     = game:GetService("TweenService")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer      = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-if not player then
-    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-    player = Players.LocalPlayer
-end
+-- ═══════════ COLORS ═══════════
+local NEON_CYAN   = Color3.fromRGB(0, 255, 255)
+local NEON_PINK   = Color3.fromRGB(255, 0, 200)
+local NEON_PURPLE = Color3.fromRGB(140, 0, 255)
+local BG_DARK     = Color3.fromRGB(8, 8, 20)
+local BG_MID      = Color3.fromRGB(15, 15, 35)
+local BG_LIGHT    = Color3.fromRGB(22, 22, 50)
+local TEXT_WHITE  = Color3.fromRGB(220, 220, 255)
+local SIDEBAR_BG  = Color3.fromRGB(10, 10, 28)
 
-local playerGui = player:WaitForChild("PlayerGui", 15)
-if not playerGui then return end
+local TW_OPEN  = TweenInfo.new(0.45, Enum.EasingStyle.Back,  Enum.EasingDirection.Out)
+local TW_CLOSE = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+local TW_FAST  = TweenInfo.new(0.18, Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
 
-local TASTE = Enum.KeyCode.O
-local BG_COLOR = Color3.fromRGB(15, 15, 20)
-local ACCENT_COLOR = Color3.fromRGB(30, 30, 40)
-local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
+local savedPos   = nil
+local panelOpen  = false
+local currentTab = "Events"
 
-pcall(function()
-    local old = playerGui:FindFirstChild("BrainrotV1")
-    if old then old:Destroy() end
-end)
+-- ═══════════ GUI ROOT ═══════════
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BrainrotV1"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 1000
+ScreenGui.Name           = "NeonAdminPanel"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = playerGui
+ScreenGui.Parent         = PlayerGui
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.BackgroundColor3 = BG_COLOR
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Visible = true
-MainFrame.Parent = ScreenGui
+-- Dark overlay (blur effect)
+local Overlay = Instance.new("Frame")
+Overlay.Size                   = UDim2.fromScale(1, 1)
+Overlay.BackgroundColor3       = Color3.fromRGB(0, 0, 10)
+Overlay.BackgroundTransparency = 1
+Overlay.ZIndex = 1
+Overlay.Parent = ScreenGui
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+-- Main window
+local Main = Instance.new("Frame")
+Main.Size              = UDim2.fromOffset(720, 450)
+Main.AnchorPoint       = Vector2.new(0.5, 0.5)
+Main.Position          = UDim2.new(0.5, 0, 0.5, 0)
+Main.BackgroundColor3  = BG_DARK
+Main.BorderSizePixel   = 0
+Main.Visible           = false
+Main.ZIndex            = 2
+Main.Parent            = ScreenGui
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2
-UIStroke.Transparency = 0.3
-UIStroke.Parent = MainFrame
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 
-task.spawn(function()
-    while MainFrame and MainFrame.Parent do
-        pcall(function()
-            UIStroke.Color = Color3.fromHSV((tick() * 0.2) % 1, 0.8, 1)
-        end)
-        task.wait()
-    end
-end)
+local BorderStroke = Instance.new("UIStroke", Main)
+BorderStroke.Thickness       = 2.5
+BorderStroke.Color           = NEON_CYAN
+BorderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -80, 0, 45)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "⚡ BrainrotV1"
-titleLabel.TextColor3 = Color3.fromRGB(220, 0, 255)
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 22
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = MainFrame
+-- Title bar
+local TitleBar = Instance.new("Frame", Main)
+TitleBar.Size             = UDim2.new(1, 0, 0, 44)
+TitleBar.BackgroundColor3 = BG_MID
+TitleBar.BorderSizePixel  = 0
+TitleBar.ZIndex           = 3
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 14)
+-- fill bottom corners
+local TF = Instance.new("Frame", TitleBar)
+TF.Size             = UDim2.new(1, 0, 0, 14)
+TF.Position         = UDim2.new(0, 0, 1, -14)
+TF.BackgroundColor3 = BG_MID
+TF.BorderSizePixel  = 0
+TF.ZIndex           = 3
 
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 35, 0, 35)
-closeBtn.Position = UDim2.new(1, -45, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = TEXT_COLOR
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.ZIndex = 10
-closeBtn.Parent = MainFrame
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+local TitleLbl = Instance.new("TextLabel", TitleBar)
+TitleLbl.Size              = UDim2.new(1, -60, 1, 0)
+TitleLbl.Position          = UDim2.new(0, 16, 0, 0)
+TitleLbl.BackgroundTransparency = 1
+TitleLbl.Text              = "⚡  NEON ADMIN  ⚡"
+TitleLbl.TextColor3        = NEON_CYAN
+TitleLbl.Font              = Enum.Font.GothamBold
+TitleLbl.TextSize          = 18
+TitleLbl.TextXAlignment    = Enum.TextXAlignment.Left
+TitleLbl.ZIndex            = 4
 
-local divider = Instance.new("Frame")
-divider.Size = UDim2.new(1, -20, 0, 1)
-divider.Position = UDim2.new(0, 10, 0, 46)
-divider.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-divider.BorderSizePixel = 0
-divider.Parent = MainFrame
+local HintLbl = Instance.new("TextLabel", TitleBar)
+HintLbl.Size              = UDim2.new(0, 100, 1, 0)
+HintLbl.Position          = UDim2.new(1, -110, 0, 0)
+HintLbl.BackgroundTransparency = 1
+HintLbl.Text              = "[O] Toggle"
+HintLbl.TextColor3        = Color3.fromRGB(100, 100, 160)
+HintLbl.Font              = Enum.Font.Gotham
+HintLbl.TextSize          = 12
+HintLbl.TextXAlignment    = Enum.TextXAlignment.Right
+HintLbl.ZIndex            = 4
 
-local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 140, 1, -55)
-Sidebar.Position = UDim2.new(0, 0, 0, 50)
-Sidebar.BackgroundColor3 = ACCENT_COLOR
-Sidebar.BorderSizePixel = 0
-Sidebar.Parent = MainFrame
-Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
+-- Sidebar
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Name             = "Sidebar"
+Sidebar.Size             = UDim2.new(0, 120, 1, -44)
+Sidebar.Position         = UDim2.new(0, 0, 0, 44)
+Sidebar.BackgroundColor3 = SIDEBAR_BG
+Sidebar.BorderSizePixel  = 0
+Sidebar.ZIndex           = 3
+local SS = Instance.new("UIStroke", Sidebar)
+SS.Color = Color3.fromRGB(30, 30, 70); SS.Thickness = 1
 
-local Content = Instance.new("Frame")
-Content.Position = UDim2.new(0, 150, 0, 55)
-Content.Size = UDim2.new(1, -160, 1, -65)
-Content.BackgroundTransparency = 1
-Content.Parent = MainFrame
+-- Content
+local Content = Instance.new("Frame", Main)
+Content.Name                  = "Content"
+Content.Size                  = UDim2.new(1, -120, 1, -44)
+Content.Position              = UDim2.new(0, 120, 0, 44)
+Content.BackgroundColor3      = BG_LIGHT
+Content.BackgroundTransparency = 0.3
+Content.BorderSizePixel       = 0
+Content.ClipsDescendants      = true
+Content.ZIndex                = 3
 
-local Tabs = {}
-local function createTab(name)
-    local TabFrame = Instance.new("ScrollingFrame")
-    TabFrame.Name = name .. "Tab"
-    TabFrame.Size = UDim2.new(1, 0, 1, 0)
-    TabFrame.BackgroundTransparency = 1
-    TabFrame.ScrollBarThickness = 2
-    TabFrame.Visible = false
-    TabFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    TabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TabFrame.Parent = Content
-    local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.Padding = UDim.new(0, 5)
-    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Parent = TabFrame
-    Tabs[name] = TabFrame
-    return TabFrame
+-- ═══════════ HELPERS ═══════════
+local function neonBtn(parent, text, size, pos, color, zi)
+    color = color or NEON_CYAN; zi = zi or 5
+    local b = Instance.new("TextButton", parent)
+    b.Size = size; b.Position = pos
+    b.BackgroundColor3 = Color3.fromRGB(15,15,40)
+    b.BackgroundTransparency = 0.1
+    b.Text = text; b.TextColor3 = color
+    b.Font = Enum.Font.GothamSemibold; b.TextSize = 13
+    b.BorderSizePixel = 0; b.AutoButtonColor = false; b.ZIndex = zi
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    local sk = Instance.new("UIStroke", b)
+    sk.Thickness = 1.5
+    sk.Color = Color3.fromRGB(color.R*255*.4, color.G*255*.4, color.B*255*.4)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b,  TW_FAST, {BackgroundColor3 = Color3.fromRGB(
+            math.clamp(math.floor(color.R*60),0,255),
+            math.clamp(math.floor(color.G*60),0,255),
+            math.clamp(math.floor(color.B*60),0,255))}):Play()
+        TweenService:Create(sk, TW_FAST, {Color=color, Thickness=2.5}):Play()
+        TweenService:Create(b,  TW_FAST, {TextColor3=Color3.new(1,1,1)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b,  TW_FAST, {BackgroundColor3 = Color3.fromRGB(15,15,40)}):Play()
+        TweenService:Create(sk, TW_FAST, {Color=Color3.fromRGB(color.R*255*.4,color.G*255*.4,color.B*255*.4), Thickness=1.5}):Play()
+        TweenService:Create(b,  TW_FAST, {TextColor3 = color}):Play()
+    end)
+    return b, sk
 end
 
-local EventsTab = createTab("Events")
-local TPTab = createTab("TP")
-local TPATab = createTab("TPA")
+local function scrollFrame(parent, size, pos)
+    local s = Instance.new("ScrollingFrame", parent)
+    s.Size = size; s.Position = pos
+    s.BackgroundTransparency = 1; s.BorderSizePixel = 0
+    s.ScrollBarThickness = 4; s.ScrollBarImageColor3 = NEON_CYAN
+    s.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    s.CanvasSize = UDim2.new(); s.ZIndex = 5
+    local l = Instance.new("UIListLayout", s)
+    l.Padding = UDim.new(0,8); l.SortOrder = Enum.SortOrder.LayoutOrder
+    local p = Instance.new("UIPadding", s)
+    p.PaddingLeft=UDim.new(0,10); p.PaddingRight=UDim.new(0,10)
+    p.PaddingTop=UDim.new(0,10);  p.PaddingBottom=UDim.new(0,10)
+    return s
+end
 
-local activeBtn = nil
-local function createSidebarButton(name, order, icon)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.88, 0, 0, 42)
-    btn.Position = UDim2.new(0.06, 0, 0, 10 + (order * 52))
-    btn.BackgroundColor3 = BG_COLOR
-    btn.Text = icon .. " " .. name
-    btn.TextColor3 = TEXT_COLOR
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Parent = Sidebar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    btn.MouseButton1Click:Connect(function()
-        for _, tab in pairs(Tabs) do tab.Visible = false end
-        if Tabs[name] then Tabs[name].Visible = true end
-        if activeBtn then
-            TweenService:Create(activeBtn, TweenInfo.new(0.15), {BackgroundColor3 = BG_COLOR}):Play()
+-- ═══════════ TABS ═══════════
+local TABS       = {"Events","TP","TPA"}
+local TAB_COLORS = {Events=NEON_CYAN, TP=NEON_PINK, TPA=NEON_PURPLE}
+local tabFrames  = {}
+local tabBtns    = {}
+
+for _,n in ipairs(TABS) do
+    local f = Instance.new("Frame", Content)
+    f.Size = UDim2.fromScale(1,1); f.BackgroundTransparency = 1
+    f.Visible = (n=="Events"); f.ZIndex = 4
+    tabFrames[n] = f
+end
+
+local sideLL = Instance.new("UIListLayout", Sidebar)
+sideLL.Padding = UDim.new(0,6)
+sideLL.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local sidePad = Instance.new("UIPadding", Sidebar)
+sidePad.PaddingTop=UDim.new(0,14); sidePad.PaddingLeft=UDim.new(0,8); sidePad.PaddingRight=UDim.new(0,8)
+
+local function selectTab(name)
+    currentTab = name
+    for _,n in ipairs(TABS) do
+        tabFrames[n].Visible = (n==name)
+        local btn = tabBtns[n]; if not btn then continue end
+        local sk  = btn:FindFirstChildWhichIsA("UIStroke")
+        local c   = TAB_COLORS[n]
+        if n==name then
+            TweenService:Create(btn,TW_FAST,{BackgroundColor3=Color3.fromRGB(math.floor(c.R*60),math.floor(c.G*60),math.floor(c.B*60))}):Play()
+            if sk then TweenService:Create(sk,TW_FAST,{Color=c,Thickness=2.5}):Play() end
+        else
+            TweenService:Create(btn,TW_FAST,{BackgroundColor3=Color3.fromRGB(15,15,40)}):Play()
+            if sk then TweenService:Create(sk,TW_FAST,{Color=Color3.fromRGB(c.R*255*.3,c.G*255*.3,c.B*255*.3),Thickness=1.5}):Play() end
         end
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 0, 120)}):Play()
-        activeBtn = btn
-    end)
-    return btn
-end
-
-local eventsBtn = createSidebarButton("Events", 0, "🔥")
-createSidebarButton("TP", 1, "🌀")
-createSidebarButton("TPA", 2, "📍")
-
-local function createContentButton(parent, text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 38)
-    btn.BackgroundColor3 = ACCENT_COLOR
-    btn.Text = text
-    btn.TextColor3 = TEXT_COLOR
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(70, 0, 100)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = ACCENT_COLOR}):Play()
-    end)
-    if callback then
-        btn.MouseButton1Click:Connect(function() pcall(callback) end)
     end
-    return btn
 end
+
+for _,n in ipairs(TABS) do
+    local b,_ = neonBtn(Sidebar, n, UDim2.new(1,0,0,44), UDim2.fromOffset(0,0), TAB_COLORS[n], 4)
+    b.TextSize = 14; tabBtns[n] = b
+    b.MouseButton1Click:Connect(function() selectTab(n) end)
+end
+selectTab("Events")
+
+-- ═══════════ EVENTS TAB ═══════════
+local evScroll = scrollFrame(tabFrames["Events"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
 
 local function refreshEvents()
-    for _, child in pairs(EventsTab:GetChildren()) do
-        if child:IsA("TextButton") or child:IsA("TextLabel") then child:Destroy() end
+    for _,c in ipairs(evScroll:GetChildren()) do
+        if c:IsA("Frame") or c:IsA("TextLabel") then c:Destroy() end
     end
-    local found = false
-    pcall(function()
-        for _, item in pairs(ReplicatedStorage:GetDescendants()) do
-            if item:IsA("RemoteEvent") then
-                found = true
-                createContentButton(EventsTab, "🔥 Fire: " .. item.Name, function()
-                    item:FireServer()
-                end)
-            end
-        end
-    end)
-    if not found then
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -10, 0, 35)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "Keine RemoteEvents gefunden"
-        lbl.TextColor3 = Color3.fromRGB(150, 150, 150)
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 13
-        lbl.Parent = EventsTab
-    end
-end
+    local n = 0
+    for _,obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            n += 1
+            local row = Instance.new("Frame", evScroll)
+            row.Size=UDim2.new(1,0,0,46); row.BackgroundColor3=BG_MID
+            row.BackgroundTransparency=0.2; row.BorderSizePixel=0
+            row.LayoutOrder=n; row.ZIndex=6
+            Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
+            local sk2=Instance.new("UIStroke",row); sk2.Thickness=1; sk2.Color=Color3.fromRGB(30,30,80)
 
-local function refreshPlayers()
-    for _, child in pairs(TPTab:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextLabel") then child:Destroy() end
-    end
-    local found = false
-    pcall(function()
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player then
-                found = true
-                local frame = Instance.new("Frame")
-                frame.Size = UDim2.new(1, -10, 0, 52)
-                frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-                frame.BorderSizePixel = 0
-                frame.Parent = TPTab
-                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+            local lbl=Instance.new("TextLabel",row)
+            lbl.Size=UDim2.new(1,-100,1,0); lbl.Position=UDim2.new(0,12,0,0)
+            lbl.BackgroundTransparency=1; lbl.Text="🔗 "..obj.Name
+            lbl.TextColor3=TEXT_WHITE; lbl.Font=Enum.Font.Gotham; lbl.TextSize=13
+            lbl.TextXAlignment=Enum.TextXAlignment.Left
+            lbl.TextTruncate=Enum.TextTruncate.AtEnd; lbl.ZIndex=7
 
-                local nameLabel = Instance.new("TextLabel")
-                nameLabel.Size = UDim2.new(0.6, 0, 1, 0)
-                nameLabel.Position = UDim2.new(0, 10, 0, 0)
-                nameLabel.BackgroundTransparency = 1
-                nameLabel.Text = "👤 " .. (p.DisplayName or p.Name)
-                nameLabel.TextColor3 = TEXT_COLOR
-                nameLabel.Font = Enum.Font.GothamBold
-                nameLabel.TextSize = 13
-                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-                nameLabel.Parent = frame
-
-                local tpButton = Instance.new("TextButton")
-                tpButton.Size = UDim2.new(0, 65, 0, 32)
-                tpButton.Position = UDim2.new(1, -75, 0.5, -16)
-                tpButton.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-                tpButton.Text = "🌀 TP"
-                tpButton.TextColor3 = TEXT_COLOR
-                tpButton.Font = Enum.Font.GothamBold
-                tpButton.TextSize = 13
-                tpButton.Parent = frame
-                Instance.new("UICorner", tpButton).CornerRadius = UDim.new(0, 6)
-
-                tpButton.MouseButton1Click:Connect(function()
-                    pcall(function()
-                        if p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-                            and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(2, 0, 0)
-                        end
-                    end)
-                end)
-            end
-        end
-    end)
-    if not found then
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -10, 0, 35)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "Keine anderen Spieler gefunden"
-        lbl.TextColor3 = Color3.fromRGB(150, 150, 150)
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 13
-        lbl.Parent = TPTab
-    end
-end
-
-local savedPositions = {}
-local function buildTPAButtons()
-    for _, child in pairs(TPATab:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    createContentButton(TPATab, "📍 Position speichern", function()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local pos = player.Character.HumanoidRootPart.CFrame
-            local idx = #savedPositions + 1
-            table.insert(savedPositions, pos)
-            createContentButton(TPATab, "🔁 TP zu Punkt " .. idx, function()
-                pcall(function()
-                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        player.Character.HumanoidRootPart.CFrame = pos
-                    end
-                end)
+            local fb,_=neonBtn(row,"Fire",UDim2.new(0,70,0,30),UDim2.new(1,-80,.5,-15),NEON_CYAN,7)
+            fb.TextSize=12
+            local cap=obj
+            fb.MouseButton1Click:Connect(function()
+                local ok=pcall(function() cap:FireServer() end)
+                if ok then
+                    TweenService:Create(fb,TW_FAST,{BackgroundColor3=Color3.fromRGB(0,60,0)}):Play()
+                    task.delay(.6,function() TweenService:Create(fb,TW_FAST,{BackgroundColor3=Color3.fromRGB(15,15,40)}):Play() end)
+                end
             end)
         end
-    end)
-    createContentButton(TPATab, "🗑️ Alle Punkte löschen", function()
-        savedPositions = {}
-        buildTPAButtons()
-    end)
-end
-buildTPAButtons()
-
-local isOpen = false
-local isTweening = false
-
-local function closePanel()
-    if isTweening then return end
-    isTweening = true
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0)
-    })
-    tween:Play()
-    tween.Completed:Connect(function()
-        MainFrame.Visible = false
-        isTweening = false
-    end)
+    end
+    if n==0 then
+        local e=Instance.new("TextLabel",evScroll)
+        e.Size=UDim2.new(1,0,0,50); e.BackgroundTransparency=1
+        e.Text="No RemoteEvents in ReplicatedStorage"
+        e.TextColor3=Color3.fromRGB(100,100,150); e.Font=Enum.Font.Gotham; e.TextSize=13; e.ZIndex=6
+    end
 end
 
-local function openPanel()
-    if isTweening then return end
-    isTweening = true
-    refreshEvents()
-    refreshPlayers()
-    for _, tab in pairs(Tabs) do tab.Visible = false end
-    EventsTab.Visible = true
-    TweenService:Create(eventsBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 0, 120)}):Play()
-    activeBtn = eventsBtn
-    MainFrame.Visible = true
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0.5, 0, 0.5, 0),
-        Position = UDim2.new(0.25, 0, 0.25, 0)
-    })
-    tween:Play()
-    tween.Completed:Connect(function() isTweening = false end)
+local rb,_=neonBtn(tabFrames["Events"],"⟳ Refresh",UDim2.new(0,120,0,26),UDim2.new(1,-128,0,6),NEON_PURPLE,6)
+rb.TextSize=12; rb.MouseButton1Click:Connect(refreshEvents)
+
+-- ═══════════ TP TAB ═══════════
+local tpScroll = scrollFrame(tabFrames["TP"], UDim2.fromScale(1,1), UDim2.fromOffset(0,0))
+
+local function refreshTP()
+    for _,c in ipairs(tpScroll:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    for i,plr in ipairs(Players:GetPlayers()) do
+        local row=Instance.new("Frame",tpScroll)
+        row.Size=UDim2.new(1,0,0,58); row.BackgroundColor3=BG_MID
+        row.BackgroundTransparency=0.2; row.BorderSizePixel=0
+        row.LayoutOrder=i; row.ZIndex=6
+        Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
+        local sk2=Instance.new("UIStroke",row); sk2.Thickness=1; sk2.Color=Color3.fromRGB(30,30,80)
+
+        local img=Instance.new("ImageLabel",row)
+        img.Size=UDim2.fromOffset(44,44); img.Position=UDim2.new(0,8,.5,-22)
+        img.BackgroundColor3=Color3.fromRGB(20,20,50); img.BorderSizePixel=0; img.ZIndex=7
+        Instance.new("UICorner",img).CornerRadius=UDim.new(1,0)
+        local imgSk=Instance.new("UIStroke",img); imgSk.Thickness=1.5; imgSk.Color=NEON_PINK
+
+        local uid=plr.UserId
+        task.spawn(function()
+            local ok,url=pcall(function()
+                return Players:GetUserThumbnailAsync(uid,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size48x48)
+            end)
+            if ok then img.Image=url end
+        end)
+
+        local nl=Instance.new("TextLabel",row)
+        nl.Size=UDim2.new(1,-170,1,0); nl.Position=UDim2.new(0,60,0,0)
+        nl.BackgroundTransparency=1; nl.Text=plr.DisplayName.."\n@"..plr.Name
+        nl.TextColor3=TEXT_WHITE; nl.Font=Enum.Font.GothamSemibold; nl.TextSize=12
+        nl.TextXAlignment=Enum.TextXAlignment.Left; nl.ZIndex=7
+
+        local tb,_=neonBtn(row,"Teleport",UDim2.new(0,88,0,32),UDim2.new(1,-96,.5,-16),NEON_PINK,7)
+        tb.TextSize=12
+        local capPlr=plr
+        tb.MouseButton1Click:Connect(function()
+            local ch=LocalPlayer.Character; local tch=capPlr.Character
+            if ch and tch then
+                local h=ch:FindFirstChild("HumanoidRootPart"); local th=tch:FindFirstChild("HumanoidRootPart")
+                if h and th then h.CFrame=th.CFrame+Vector3.new(2,0,2) end
+            end
+        end)
+    end
 end
 
-local function toggle()
-    isOpen = not isOpen
-    if isOpen then openPanel() else closePanel() end
-end
+local tprb,_=neonBtn(tabFrames["TP"],"⟳ Refresh",UDim2.new(0,120,0,26),UDim2.new(1,-128,0,6),NEON_PINK,6)
+tprb.TextSize=12; tprb.MouseButton1Click:Connect(refreshTP)
 
-closeBtn.MouseButton1Click:Connect(function()
-    isOpen = false
-    pcall(closePanel)
-end)
+-- ═══════════ TPA TAB ═══════════
+local TF2=tabFrames["TPA"]
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == TASTE then
-        pcall(toggle)
+local tTitle=Instance.new("TextLabel",TF2)
+tTitle.Size=UDim2.new(1,0,0,40); tTitle.Position=UDim2.new(0,0,0,16)
+tTitle.BackgroundTransparency=1; tTitle.Text="📍  Teleport Anchor"
+tTitle.TextColor3=NEON_PURPLE; tTitle.Font=Enum.Font.GothamBold; tTitle.TextSize=18; tTitle.ZIndex=5
+
+local posLbl=Instance.new("TextLabel",TF2)
+posLbl.Size=UDim2.new(1,-40,0,36); posLbl.Position=UDim2.new(0,20,0,70)
+posLbl.BackgroundColor3=BG_MID; posLbl.BackgroundTransparency=0.1
+posLbl.Text="No position saved"; posLbl.TextColor3=Color3.fromRGB(120,120,180)
+posLbl.Font=Enum.Font.Code; posLbl.TextSize=13; posLbl.BorderSizePixel=0; posLbl.ZIndex=5
+Instance.new("UICorner",posLbl).CornerRadius=UDim.new(0,8)
+local posSk=Instance.new("UIStroke",posLbl); posSk.Thickness=1; posSk.Color=Color3.fromRGB(60,0,120)
+
+local svBtn,_=neonBtn(TF2,"💾  Save Current Position",UDim2.new(1,-40,0,44),UDim2.new(0,20,0,124),NEON_PURPLE,5)
+svBtn.TextSize=14
+svBtn.MouseButton1Click:Connect(function()
+    local ch=LocalPlayer.Character
+    if ch then
+        local h=ch:FindFirstChild("HumanoidRootPart")
+        if h then
+            savedPos=h.CFrame; local p=h.Position
+            posLbl.Text=("X: %.1f   Y: %.1f   Z: %.1f"):format(p.X,p.Y,p.Z)
+            posLbl.TextColor3=NEON_PURPLE
+            TweenService:Create(posSk,TW_FAST,{Color=NEON_PURPLE}):Play()
+        end
     end
 end)
 
--- Direkt beim Start öffnen
-task.spawn(function()
-    task.wait(0.3)
-    pcall(openPanel)
-    isOpen = true
+local goBtn,_=neonBtn(TF2,"🚀  Go to Saved Position",UDim2.new(1,-40,0,44),UDim2.new(0,20,0,182),NEON_CYAN,5)
+goBtn.TextSize=14
+goBtn.MouseButton1Click:Connect(function()
+    if savedPos then
+        local ch=LocalPlayer.Character
+        if ch then local h=ch:FindFirstChild("HumanoidRootPart"); if h then h.CFrame=savedPos end end
+    else
+        posLbl.Text="⚠  Save a position first!"; posLbl.TextColor3=NEON_PINK
+    end
 end)
 
-print("[BrainrotV1] Geladen.")
+local clrBtn,_=neonBtn(TF2,"✕  Clear Saved Position",UDim2.new(1,-40,0,36),UDim2.new(0,20,0,240),NEON_PINK,5)
+clrBtn.TextSize=13
+clrBtn.MouseButton1Click:Connect(function()
+    savedPos=nil; posLbl.Text="No position saved"
+    posLbl.TextColor3=Color3.fromRGB(120,120,180)
+    TweenService:Create(posSk,TW_FAST,{Color=Color3.fromRGB(60,0,120)}):Play()
+end)
+
+-- ═══════════ OPEN / CLOSE ═══════════
+local function openPanel()
+    panelOpen=true; refreshEvents(); refreshTP()
+    Main.Size=UDim2.fromOffset(0,0); Main.Position=UDim2.new(.5,0,.5,0); Main.Visible=true
+    TweenService:Create(Overlay,TW_OPEN,{BackgroundTransparency=0.55}):Play()
+    TweenService:Create(Main,TW_OPEN,{Size=UDim2.fromOffset(720,450),Position=UDim2.new(.5,-360,.5,-225)}):Play()
+end
+
+local function closePanel()
+    panelOpen=false
+    TweenService:Create(Overlay,TW_CLOSE,{BackgroundTransparency=1}):Play()
+    local t=TweenService:Create(Main,TW_CLOSE,{Size=UDim2.fromOffset(0,0),Position=UDim2.new(.5,0,.5,0)})
+    t:Play()
+    t.Completed:Connect(function() if not panelOpen then Main.Visible=false end end)
+end
+
+-- ═══════════ ANIMATED BORDER ═══════════
+local hue=0
+RunService.Heartbeat:Connect(function(dt)
+    if not Main.Visible then return end
+    hue=(hue+dt*0.3)%1
+    BorderStroke.Color=Color3.fromHSV(hue,1,1)
+end)
+
+-- ═══════════ KEYBIND [O] ═══════════
+UserInputService.InputBegan:Connect(function(inp,gp)
+    if gp then return end
+    if inp.KeyCode==Enum.KeyCode.O then
+        if panelOpen then closePanel() else openPanel() end
+    end
+end)
+
+-- ═══════════ HINT BADGE ═══════════
+local hGui=Instance.new("ScreenGui",PlayerGui)
+hGui.Name="AdminHint"; hGui.ResetOnSpawn=false
+
+local badge=Instance.new("TextLabel",hGui)
+badge.Size=UDim2.fromOffset(170,28); badge.Position=UDim2.new(.5,-85,1,-44)
+badge.BackgroundColor3=Color3.fromRGB(8,8,20); badge.BackgroundTransparency=0.2
+badge.Text="⚡  [O]  Admin Panel  ⚡"
+badge.Font=Enum.Font.GothamSemibold; badge.TextSize=12; badge.BorderSizePixel=0
+Instance.new("UICorner",badge).CornerRadius=UDim.new(0,6)
+local bSk=Instance.new("UIStroke",badge); bSk.Thickness=1.5; bSk.Color=NEON_CYAN
+
+local bHue=0
+RunService.Heartbeat:Connect(function(dt)
+    bHue=(bHue+dt*.5)%1
+    local c=Color3.fromHSV(bHue,1,1)
+    bSk.Color=c; badge.TextColor3=c
+end)
+
+print("✅ Neon Admin Panel ready — press [O] to toggle!")
