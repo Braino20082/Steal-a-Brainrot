@@ -1,0 +1,212 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local savedPosition = nil
+
+-- GUI
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "AdminPanel"
+
+-- Main Frame
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 700, 0, 450)
+main.Position = UDim2.new(0.5, -350, 0.5, -225)
+main.BackgroundColor3 = Color3.fromRGB(18,18,18)
+main.Active = true
+main.Draggable = true
+
+-- Topbar
+local top = Instance.new("Frame", main)
+top.Size = UDim2.new(1,0,0,40)
+top.BackgroundColor3 = Color3.fromRGB(28,28,28)
+
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1,-80,1,0)
+title.Position = UDim2.new(0,10,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Admin Control Panel"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Close
+local close = Instance.new("TextButton", top)
+close.Size = UDim2.new(0,40,1,0)
+close.Position = UDim2.new(1,-40,0,0)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(150,0,0)
+close.TextColor3 = Color3.new(1,1,1)
+
+-- Minimize
+local minimize = Instance.new("TextButton", top)
+minimize.Size = UDim2.new(0,40,1,0)
+minimize.Position = UDim2.new(1,-80,0,0)
+minimize.Text = "-"
+minimize.BackgroundColor3 = Color3.fromRGB(60,60,60)
+minimize.TextColor3 = Color3.new(1,1,1)
+
+-- Sidebar
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0,150,1,-40)
+sidebar.Position = UDim2.new(0,0,0,40)
+sidebar.BackgroundColor3 = Color3.fromRGB(25,25,25)
+
+-- Content Area
+local content = Instance.new("Frame", main)
+content.Size = UDim2.new(1,-150,1,-40)
+content.Position = UDim2.new(0,150,0,40)
+content.BackgroundColor3 = Color3.fromRGB(20,20,20)
+
+-- Layout Sidebar
+local sideLayout = Instance.new("UIListLayout", sidebar)
+sideLayout.Padding = UDim.new(0,5)
+
+-- Funktion zum Leeren
+local function clearContent()
+	for _,v in pairs(content:GetChildren()) do
+		if not v:IsA("UIListLayout") then
+			v:Destroy()
+		end
+	end
+end
+
+-- BUTTON ERSTELLER
+local function createSideButton(text, callback)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,0,0,40)
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	btn.Parent = sidebar
+	
+	btn.MouseButton1Click:Connect(callback)
+end
+
+------------------------------------------------
+-- EVENTS
+------------------------------------------------
+
+createSideButton("Events", function()
+	clearContent()
+	
+	local layout = Instance.new("UIListLayout", content)
+	layout.Padding = UDim.new(0,8)
+	
+	for _,obj in ipairs(ReplicatedStorage:GetDescendants()) do
+		if obj:IsA("RemoteEvent") then
+			
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1,-20,0,40)
+			btn.Text = obj.Name
+			btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+			btn.TextColor3 = Color3.new(1,1,1)
+			btn.Font = Enum.Font.Gotham
+			btn.TextSize = 14
+			btn.Parent = content
+			
+			btn.MouseButton1Click:Connect(function()
+				obj:FireServer()
+				btn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+				task.wait(0.2)
+				btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+			end)
+		end
+	end
+end)
+
+------------------------------------------------
+-- TP
+------------------------------------------------
+
+createSideButton("TP", function()
+	clearContent()
+	
+	local layout = Instance.new("UIListLayout", content)
+	layout.Padding = UDim.new(0,8)
+	
+	for _,plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player then
+			
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1,-20,0,40)
+			btn.Text = plr.Name
+			btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+			btn.TextColor3 = Color3.new(1,1,1)
+			btn.Font = Enum.Font.Gotham
+			btn.TextSize = 14
+			btn.Parent = content
+			
+			btn.MouseButton1Click:Connect(function()
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					player.Character.HumanoidRootPart.CFrame =
+						plr.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-3)
+				end
+			end)
+		end
+	end
+end)
+
+------------------------------------------------
+-- TPA (Eigener Teleport)
+------------------------------------------------
+
+createSideButton("TPA", function()
+	clearContent()
+	
+	local layout = Instance.new("UIListLayout", content)
+	layout.Padding = UDim.new(0,10)
+	
+	local save = Instance.new("TextButton")
+	save.Size = UDim2.new(1,-20,0,40)
+	save.Text = "Position Speichern"
+	save.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	save.TextColor3 = Color3.new(1,1,1)
+	save.Parent = content
+	
+	save.MouseButton1Click:Connect(function()
+		if player.Character then
+			savedPosition = player.Character.HumanoidRootPart.CFrame
+			save.BackgroundColor3 = Color3.fromRGB(0,120,0)
+		end
+	end)
+	
+	local teleport = Instance.new("TextButton")
+	teleport.Size = UDim2.new(1,-20,0,40)
+	teleport.Text = "Teleportieren"
+	teleport.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	teleport.TextColor3 = Color3.new(1,1,1)
+	teleport.Parent = content
+	
+	teleport.MouseButton1Click:Connect(function()
+		if savedPosition and player.Character then
+			player.Character.HumanoidRootPart.CFrame = savedPosition
+		end
+	end)
+end)
+
+------------------------------------------------
+-- CLOSE / MINIMIZE
+------------------------------------------------
+
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+local minimized = false
+minimize.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	
+	if minimized then
+		sidebar.Visible = false
+		content.Visible = false
+		main.Size = UDim2.new(0,700,0,40)
+	else
+		sidebar.Visible = true
+		content.Visible = true
+		main.Size = UDim2.new(0,700,0,450)
+	end
+end)
