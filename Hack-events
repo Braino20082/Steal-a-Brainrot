@@ -1,69 +1,129 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local savedPosition = nil
+local isOpen = false
 
+------------------------------------------------
+-- 🌫 BLUR
+------------------------------------------------
+
+local blur = Instance.new("BlurEffect")
+blur.Size = 0
+blur.Enabled = false
+blur.Parent = Lighting
+
+------------------------------------------------
 -- GUI
-local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "AdminPanel"
+------------------------------------------------
 
--- Main Frame
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "NeonAdminPanel"
+gui.Enabled = false
+
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 700, 0, 450)
-main.Position = UDim2.new(0.5, -350, 0.5, -225)
-main.BackgroundColor3 = Color3.fromRGB(18,18,18)
+main.Size = UDim2.new(0, 750, 0, 480)
+main.Position = UDim2.new(0.5, -375, 0.5, -240)
+main.BackgroundColor3 = Color3.fromRGB(15,15,15)
+main.BorderSizePixel = 0
 main.Active = true
 main.Draggable = true
 
--- Topbar
+local scale = Instance.new("UIScale", main)
+scale.Scale = 0.8
+
+-- 🌈 Neon Border
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 3
+stroke.Color = Color3.fromRGB(0,255,255)
+
+local gradient = Instance.new("UIGradient", stroke)
+gradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0,255,255)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,0,255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0,255,255))
+}
+
+task.spawn(function()
+	while true do
+		TweenService:Create(gradient, TweenInfo.new(3, Enum.EasingStyle.Linear), {
+			Rotation = gradient.Rotation + 180
+		}):Play()
+		task.wait(3)
+	end
+end)
+
+------------------------------------------------
+-- 🎨 HOVER NEON FUNCTION
+------------------------------------------------
+
+local function applyNeonHover(button)
+	local s = Instance.new("UIStroke", button)
+	s.Thickness = 0
+	s.Color = Color3.fromRGB(0,255,255)
+
+	button.MouseEnter:Connect(function()
+		TweenService:Create(s, TweenInfo.new(0.2), {Thickness = 3}):Play()
+		TweenService:Create(button, TweenInfo.new(0.2), {
+			BackgroundColor3 = Color3.fromRGB(30,30,30)
+		}):Play()
+	end)
+
+	button.MouseLeave:Connect(function()
+		TweenService:Create(s, TweenInfo.new(0.2), {Thickness = 0}):Play()
+		TweenService:Create(button, TweenInfo.new(0.2), {
+			BackgroundColor3 = Color3.fromRGB(40,40,40)
+		}):Play()
+	end)
+end
+
+------------------------------------------------
+-- TOPBAR
+------------------------------------------------
+
 local top = Instance.new("Frame", main)
 top.Size = UDim2.new(1,0,0,40)
-top.BackgroundColor3 = Color3.fromRGB(28,28,28)
+top.BackgroundColor3 = Color3.fromRGB(25,25,25)
 
 local title = Instance.new("TextLabel", top)
 title.Size = UDim2.new(1,-80,1,0)
 title.Position = UDim2.new(0,10,0,0)
 title.BackgroundTransparency = 1
-title.Text = "Admin Control Panel"
+title.Text = "🌈 Neon Admin Panel"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Close
 local close = Instance.new("TextButton", top)
 close.Size = UDim2.new(0,40,1,0)
 close.Position = UDim2.new(1,-40,0,0)
 close.Text = "X"
 close.BackgroundColor3 = Color3.fromRGB(150,0,0)
 close.TextColor3 = Color3.new(1,1,1)
+applyNeonHover(close)
 
--- Minimize
-local minimize = Instance.new("TextButton", top)
-minimize.Size = UDim2.new(0,40,1,0)
-minimize.Position = UDim2.new(1,-80,0,0)
-minimize.Text = "-"
-minimize.BackgroundColor3 = Color3.fromRGB(60,60,60)
-minimize.TextColor3 = Color3.new(1,1,1)
+------------------------------------------------
+-- SIDEBAR
+------------------------------------------------
 
--- Sidebar
 local sidebar = Instance.new("Frame", main)
-sidebar.Size = UDim2.new(0,150,1,-40)
+sidebar.Size = UDim2.new(0,160,1,-40)
 sidebar.Position = UDim2.new(0,0,0,40)
-sidebar.BackgroundColor3 = Color3.fromRGB(25,25,25)
+sidebar.BackgroundColor3 = Color3.fromRGB(20,20,20)
 
--- Content Area
 local content = Instance.new("Frame", main)
-content.Size = UDim2.new(1,-150,1,-40)
-content.Position = UDim2.new(0,150,0,40)
-content.BackgroundColor3 = Color3.fromRGB(20,20,20)
+content.Size = UDim2.new(1,-160,1,-40)
+content.Position = UDim2.new(0,160,0,40)
+content.BackgroundColor3 = Color3.fromRGB(18,18,18)
 
--- Layout Sidebar
 local sideLayout = Instance.new("UIListLayout", sidebar)
 sideLayout.Padding = UDim.new(0,5)
 
--- Funktion zum Leeren
 local function clearContent()
 	for _,v in pairs(content:GetChildren()) do
 		if not v:IsA("UIListLayout") then
@@ -72,75 +132,89 @@ local function clearContent()
 	end
 end
 
--- BUTTON ERSTELLER
 local function createSideButton(text, callback)
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1,0,0,40)
+	btn.Size = UDim2.new(1,0,0,45)
 	btn.Text = text
-	btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 	btn.TextColor3 = Color3.new(1,1,1)
 	btn.Font = Enum.Font.Gotham
 	btn.TextSize = 14
 	btn.Parent = sidebar
 	
+	applyNeonHover(btn)
 	btn.MouseButton1Click:Connect(callback)
 end
 
 ------------------------------------------------
--- EVENTS
+-- EVENTS TAB
 ------------------------------------------------
 
 createSideButton("Events", function()
 	clearContent()
-	
 	local layout = Instance.new("UIListLayout", content)
 	layout.Padding = UDim.new(0,8)
-	
+
 	for _,obj in ipairs(ReplicatedStorage:GetDescendants()) do
 		if obj:IsA("RemoteEvent") then
-			
 			local btn = Instance.new("TextButton")
 			btn.Size = UDim2.new(1,-20,0,40)
 			btn.Text = obj.Name
 			btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 			btn.TextColor3 = Color3.new(1,1,1)
-			btn.Font = Enum.Font.Gotham
-			btn.TextSize = 14
 			btn.Parent = content
 			
+			applyNeonHover(btn)
+			
 			btn.MouseButton1Click:Connect(function()
-				obj:FireServer()
-				btn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-				task.wait(0.2)
-				btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+				pcall(function()
+					obj:FireServer()
+				end)
 			end)
 		end
 	end
 end)
 
 ------------------------------------------------
--- TP
+-- TP TAB 💎
 ------------------------------------------------
 
 createSideButton("TP", function()
 	clearContent()
-	
 	local layout = Instance.new("UIListLayout", content)
 	layout.Padding = UDim.new(0,8)
-	
+
 	for _,plr in ipairs(Players:GetPlayers()) do
 		if plr ~= player then
 			
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1,-20,0,40)
-			btn.Text = plr.Name
-			btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-			btn.TextColor3 = Color3.new(1,1,1)
-			btn.Font = Enum.Font.Gotham
-			btn.TextSize = 14
-			btn.Parent = content
+			local frame = Instance.new("Frame", content)
+			frame.Size = UDim2.new(1,-20,0,60)
+			frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
 			
-			btn.MouseButton1Click:Connect(function()
+			local avatar = Instance.new("ImageLabel", frame)
+			avatar.Size = UDim2.new(0,50,0,50)
+			avatar.Position = UDim2.new(0,5,0.5,-25)
+			avatar.BackgroundTransparency = 1
+			avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="
+				..plr.UserId.."&width=420&height=420&format=png"
+			
+			local name = Instance.new("TextLabel", frame)
+			name.Size = UDim2.new(1,-120,1,0)
+			name.Position = UDim2.new(0,65,0,0)
+			name.BackgroundTransparency = 1
+			name.Text = plr.Name
+			name.TextColor3 = Color3.new(1,1,1)
+			
+			local tpBtn = Instance.new("TextButton", frame)
+			tpBtn.Size = UDim2.new(0,60,0,35)
+			tpBtn.Position = UDim2.new(1,-70,0.5,-17)
+			tpBtn.Text = "TP"
+			tpBtn.BackgroundColor3 = Color3.fromRGB(0,100,200)
+			tpBtn.TextColor3 = Color3.new(1,1,1)
+			
+			applyNeonHover(tpBtn)
+			
+			tpBtn.MouseButton1Click:Connect(function()
 				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 					player.Character.HumanoidRootPart.CFrame =
 						plr.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-3)
@@ -151,36 +225,34 @@ createSideButton("TP", function()
 end)
 
 ------------------------------------------------
--- TPA (Eigener Teleport)
+-- TPA TAB
 ------------------------------------------------
 
 createSideButton("TPA", function()
 	clearContent()
-	
 	local layout = Instance.new("UIListLayout", content)
 	layout.Padding = UDim.new(0,10)
-	
-	local save = Instance.new("TextButton")
-	save.Size = UDim2.new(1,-20,0,40)
+
+	local save = Instance.new("TextButton", content)
+	save.Size = UDim2.new(1,-20,0,45)
 	save.Text = "Position Speichern"
-	save.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	save.BackgroundColor3 = Color3.fromRGB(40,40,40)
 	save.TextColor3 = Color3.new(1,1,1)
-	save.Parent = content
-	
+	applyNeonHover(save)
+
 	save.MouseButton1Click:Connect(function()
 		if player.Character then
 			savedPosition = player.Character.HumanoidRootPart.CFrame
-			save.BackgroundColor3 = Color3.fromRGB(0,120,0)
 		end
 	end)
-	
-	local teleport = Instance.new("TextButton")
-	teleport.Size = UDim2.new(1,-20,0,40)
+
+	local teleport = Instance.new("TextButton", content)
+	teleport.Size = UDim2.new(1,-20,0,45)
 	teleport.Text = "Teleportieren"
-	teleport.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	teleport.BackgroundColor3 = Color3.fromRGB(40,40,40)
 	teleport.TextColor3 = Color3.new(1,1,1)
-	teleport.Parent = content
-	
+	applyNeonHover(teleport)
+
 	teleport.MouseButton1Click:Connect(function()
 		if savedPosition and player.Character then
 			player.Character.HumanoidRootPart.CFrame = savedPosition
@@ -189,24 +261,37 @@ createSideButton("TPA", function()
 end)
 
 ------------------------------------------------
--- CLOSE / MINIMIZE
+-- OPEN / CLOSE
 ------------------------------------------------
 
+local function openPanel()
+	gui.Enabled = true
+	blur.Enabled = true
+	TweenService:Create(blur, TweenInfo.new(0.4), {Size = 20}):Play()
+	TweenService:Create(scale, TweenInfo.new(0.4, Enum.EasingStyle.Back), {Scale = 1}):Play()
+end
+
+local function closePanel()
+	TweenService:Create(blur, TweenInfo.new(0.3), {Size = 0}):Play()
+	TweenService:Create(scale, TweenInfo.new(0.3), {Scale = 0.8}):Play()
+	task.wait(0.25)
+	gui.Enabled = false
+	blur.Enabled = false
+end
+
 close.MouseButton1Click:Connect(function()
-	gui:Destroy()
+	isOpen = false
+	closePanel()
 end)
 
-local minimized = false
-minimize.MouseButton1Click:Connect(function()
-	minimized = not minimized
-	
-	if minimized then
-		sidebar.Visible = false
-		content.Visible = false
-		main.Size = UDim2.new(0,700,0,40)
-	else
-		sidebar.Visible = true
-		content.Visible = true
-		main.Size = UDim2.new(0,700,0,450)
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.O then
+		isOpen = not isOpen
+		if isOpen then
+			openPanel()
+		else
+			closePanel()
+		end
 	end
 end)
