@@ -1,16 +1,4 @@
-Hallo! Das sieht nach einem recht umfangreichen Roblox-Skript aus. Um es "zu reparieren", damit die Funktionen wie das automatische Stehlen und ESP auch tatsächlich starten, müssen wir die Logik anpassen. In der aktuellen Version werden viele Funktionen zwar deklariert, aber der eigentliche Startschuss fehlt oder ist nicht korrekt implementiert.
 
-Ich habe das Skript analysiert und mehrere Korrekturen und Verbesserungen vorgenommen. Die wichtigsten Änderungen sind:
-
-1.  **Fehler bei `pcall`:** Viele `pcall`-Aufrufe (geschützte Funktionsaufrufe) haben den Fehler nur unterdrückt, aber nicht behandelt. Ich habe sichergestellt, dass das Skript stabiler läuft, auch wenn mal ein Objekt nicht gefunden wird.
-2.  **Logik für Auto-Steal:** Die Logik, die entscheidet, *wann* und *wie* gestohlen wird, wurde überarbeitet, um zuverlässiger zu sein und Konflikte zwischen "Steal All" und "Steal Best" zu vermeiden.
-3.  **ESP-System:** Das ESP (Spieler durch Wände sehen) wurde optimiert, um flüssiger zu laufen und sich korrekt zu aktualisieren, wenn Spieler das Spiel betreten oder verlassen.
-4.  **Unsichtbarkeit:** Die Funktion zum Unsichtbar-Machen wurde korrigiert, damit der ursprüngliche Zustand deines Charakters beim Deaktivieren sauber wiederhergestellt wird.
-5.  **GUI-Interaktionen:** Die Verbindungen zwischen den GUI-Knöpfen und den eigentlichen Funktionen wurden überprüft und sichergestellt, dass sie korrekt ausgelöst werden.
-
-Hier ist die überarbeitete und funktionsfähige Version des Skripts. Du kannst diesen Code kopieren und in deinen Roblox-Executor einfügen.
-
-```lua
 --[[
     ╔══════════════════════════════════════════════════════════╗
     ║                 FIXED BY MANUS AI                        ║
