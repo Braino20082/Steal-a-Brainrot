@@ -1,13 +1,9 @@
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-
 local player = Players.LocalPlayer
-local savedPosition = nil
-local isOpen = false
 
+local gui = Instance.new("ScreenGui")
+gui.Name = "NeonAdminPanel"
+gui.Parent = player:WaitForChild("PlayerGui")
 ------------------------------------------------
 -- 🌫 BLUR
 ------------------------------------------------
