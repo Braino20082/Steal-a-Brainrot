@@ -1,13 +1,11 @@
--- Event-System in EINEM Script
+-- SINGLE SCRIPT: Event-System + GUI
 
 local events = {}
 
--- Event registrieren
 local function registerEvent(name, func)
     events[name] = func
 end
 
--- Event starten
 local function startEvent(name, ...)
     if events[name] then
         print("Event gestartet:", name)
@@ -26,6 +24,38 @@ registerEvent("GiveItem", function(item)
     print("Item gegeben:", item)
 end)
 
--- Events testen
-startEvent("SpawnZombie")
-startEvent("GiveItem", "Sword")
+-- GUI erstellen
+local screen = Instance.new("ScreenGui")
+screen.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 200)
+frame.Position = UDim2.new(0.5, -100, 0.5, -100)
+frame.Parent = screen
+
+local title = Instance.new("TextLabel")
+title.Text = "Event Starter"
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Parent = frame
+
+-- Button 1
+local btn1 = Instance.new("TextButton")
+btn1.Text = "Spawn Zombie"
+btn1.Size = UDim2.new(1, 0, 0, 50)
+btn1.Position = UDim2.new(0, 0, 0, 40)
+btn1.Parent = frame
+
+btn1.MouseButton1Click:Connect(function()
+    startEvent("SpawnZombie")
+end)
+
+-- Button 2
+local btn2 = Instance.new("TextButton")
+btn2.Text = "Give Item"
+btn2.Size = UDim2.new(1, 0, 0, 50)
+btn2.Position = UDim2.new(0, 0, 0, 100)
+btn2.Parent = frame
+
+btn2.MouseButton1Click:Connect(function()
+    startEvent("GiveItem", "Sword")
+end)
