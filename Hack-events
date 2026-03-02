@@ -4,6 +4,10 @@
     Taste: 'O' zum Öffnen/Schließen
 ]]
 
+-- CoreGui & alle möglichen Fehler abfangen
+pcall(function() game:GetService("CoreGui") end)
+pcall(function() game:GetService("StarterGui"):SetCore("ResetButtonCallback", false) end)
+
 if not game:IsLoaded() then
     game.Loaded:Wait()
 end
@@ -30,8 +34,11 @@ local BG_COLOR = Color3.fromRGB(15, 15, 20)
 local ACCENT_COLOR = Color3.fromRGB(30, 30, 40)
 local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
 
-local oldGui = playerGui:FindFirstChild("B-AdminPanel_Final")
-if oldGui then oldGui:Destroy() end
+-- Altes GUI entfernen
+pcall(function()
+    local oldGui = playerGui:FindFirstChild("B-AdminPanel_Final")
+    if oldGui then oldGui:Destroy() end
+end)
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "B-AdminPanel_Final"
@@ -50,9 +57,7 @@ MainFrame.ClipsDescendants = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 2
@@ -61,7 +66,9 @@ UIStroke.Parent = MainFrame
 
 task.spawn(function()
     while MainFrame and MainFrame.Parent do
-        UIStroke.Color = Color3.fromHSV((tick() * 0.2) % 1, 0.8, 1)
+        pcall(function()
+            UIStroke.Color = Color3.fromHSV((tick() * 0.2) % 1, 0.8, 1)
+        end)
         task.wait()
     end
 end)
@@ -164,8 +171,7 @@ local function createContentButton(parent, text, callback)
     end)
     if callback then
         btn.MouseButton1Click:Connect(function()
-            local ok, err = pcall(callback)
-            if not ok then warn("[AdminPanel] Fehler: " .. tostring(err)) end
+            pcall(callback)
         end)
     end
     return btn
@@ -205,48 +211,50 @@ local function refreshPlayers()
         if child:IsA("Frame") or child:IsA("TextLabel") then child:Destroy() end
     end
     local found = false
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player then
-            found = true
-            local frame = Instance.new("Frame")
-            frame.Size = UDim2.new(1, -10, 0, 50)
-            frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-            frame.BorderSizePixel = 0
-            frame.Parent = TPTab
-            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    pcall(function()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then
+                found = true
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, -10, 0, 50)
+                frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+                frame.BorderSizePixel = 0
+                frame.Parent = TPTab
+                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Size = UDim2.new(0.6, 0, 1, 0)
-            nameLabel.Position = UDim2.new(0, 10, 0, 0)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.Text = "👤 " .. (p.DisplayName or p.Name)
-            nameLabel.TextColor3 = TEXT_COLOR
-            nameLabel.Font = Enum.Font.GothamBold
-            nameLabel.TextSize = 13
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.Parent = frame
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.6, 0, 1, 0)
+                nameLabel.Position = UDim2.new(0, 10, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = "👤 " .. (p.DisplayName or p.Name)
+                nameLabel.TextColor3 = TEXT_COLOR
+                nameLabel.Font = Enum.Font.GothamBold
+                nameLabel.TextSize = 13
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.Parent = frame
 
-            local tpBtn = Instance.new("TextButton")
-            tpBtn.Size = UDim2.new(0, 60, 0, 30)
-            tpBtn.Position = UDim2.new(1, -70, 0.5, -15)
-            tpBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-            tpBtn.Text = "TP"
-            tpBtn.TextColor3 = TEXT_COLOR
-            tpBtn.Font = Enum.Font.GothamBold
-            tpBtn.TextSize = 13
-            tpBtn.Parent = frame
-            Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+                local tpBtn = Instance.new("TextButton")
+                tpBtn.Size = UDim2.new(0, 60, 0, 30)
+                tpBtn.Position = UDim2.new(1, -70, 0.5, -15)
+                tpBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+                tpBtn.Text = "TP"
+                tpBtn.TextColor3 = TEXT_COLOR
+                tpBtn.Font = Enum.Font.GothamBold
+                tpBtn.TextSize = 13
+                tpBtn.Parent = frame
+                Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-            tpBtn.MouseButton1Click:Connect(function()
-                pcall(function()
-                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-                        and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(2, 0, 0)
-                    end
+                tpBtn.MouseButton1Click:Connect(function()
+                    pcall(function()
+                        if p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                            and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(2, 0, 0)
+                        end
+                    end)
                 end)
-            end)
+            end
         end
-    end
+    end)
     if not found then
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(1, -10, 0, 35)
@@ -261,7 +269,6 @@ end
 
 -- TPA Tab
 local savedPositions = {}
-
 local function buildTPAButtons()
     for _, child in pairs(TPATab:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -331,12 +338,14 @@ closeBtn.MouseButton1Click:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == TASTE then toggle() end
+    if not gpe and input.KeyCode == TASTE then
+        pcall(toggle)
+    end
 end)
 
 task.spawn(function()
     task.wait(0.5)
-    toggle()
+    pcall(toggle)
 end)
 
 print("[AdminPanel] ✅ Geladen. Taste 'O' zum Öffnen/Schließen.")
